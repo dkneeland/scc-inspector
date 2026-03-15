@@ -1,0 +1,109 @@
+{
+  "description": "Timecode test cases for SCC files",
+  "parseTests": [
+    {"input": "00:00:00:00", "expected": {"hours": 0, "minutes": 0, "seconds": 0, "frames": 0}},
+    {"input": "01:23:45:12", "expected": {"hours": 1, "minutes": 23, "seconds": 45, "frames": 12}},
+    {"input": "00:00:00;00", "expected": {"hours": 0, "minutes": 0, "seconds": 0, "frames": 0}},
+    {"input": "01:00:00;02", "expected": {"hours": 1, "minutes": 0, "seconds": 0, "frames": 2}},
+    {"input": "23:59:59:29", "expected": {"hours": 23, "minutes": 59, "seconds": 59, "frames": 29}}
+  ],
+  "validationTests": [
+    {"input": "00:00:00:00", "valid": true},
+    {"input": "23:59:59:29", "valid": true},
+    {"input": "01:00:00;02", "valid": true},
+    {"input": "12:34:56:12", "valid": true},
+    {"input": "24:00:00:00", "valid": false, "reason": "Hour > 23"},
+    {"input": "00:60:00:00", "valid": false, "reason": "Minute > 59"},
+    {"input": "00:00:60:00", "valid": false, "reason": "Second > 59"},
+    {"input": "00:00:00:30", "valid": false, "reason": "Frame > 29"},
+    {"input": "invalid", "valid": false, "reason": "Not a timestamp"},
+    {"input": "00:00:00", "valid": false, "reason": "Missing frame field"}
+  ],
+  "addFramesTests": {
+    "23.98": {
+      "description": "23.98 fps cadence: 5 packets -> 4 frames",
+      "tests": [
+        {"start": "00:00:00:00", "offset": 0, "expected": "00:00:00:00", "expectedFrameOffset": 0},
+        {"start": "00:00:00:00", "offset": 1, "expected": "00:00:00:01", "expectedFrameOffset": 1},
+        {"start": "00:00:00:00", "offset": 2, "expected": "00:00:00:02", "expectedFrameOffset": 2},
+        {"start": "00:00:00:00", "offset": 3, "expected": "00:00:00:03", "expectedFrameOffset": 3},
+        {"start": "00:00:00:00", "offset": 4, "expected": "00:00:00:03", "expectedFrameOffset": 3, "note": "5th packet repeats frame 3"},
+        {"start": "00:00:00:00", "offset": 5, "expected": "00:00:00:04", "expectedFrameOffset": 4},
+        {"start": "00:00:00:00", "offset": 9, "expected": "00:00:00:07", "expectedFrameOffset": 7, "note": "10th packet repeats frame 7"},
+        {"start": "00:00:00:00", "offset": 10, "expected": "00:00:00:08", "expectedFrameOffset": 8},
+        {"start": "00:00:00:00", "offset": 120, "expected": "00:00:04:00", "expectedFrameOffset": 96, "note": "120 packets = 96 frames = 4 seconds"}
+      ]
+    },
+    "25": {
+      "description": "25 fps cadence: 6 packets -> 5 frames",
+      "tests": [
+        {"start": "00:00:00:00", "offset": 0, "expected": "00:00:00:00", "expectedFrameOffset": 0},
+        {"start": "00:00:00:00", "offset": 1, "expected": "00:00:00:01", "expectedFrameOffset": 1},
+        {"start": "00:00:00:00", "offset": 2, "expected": "00:00:00:02", "expectedFrameOffset": 2},
+        {"start": "00:00:00:00", "offset": 3, "expected": "00:00:00:03", "expectedFrameOffset": 3},
+        {"start": "00:00:00:00", "offset": 4, "expected": "00:00:00:04", "expectedFrameOffset": 4},
+        {"start": "00:00:00:00", "offset": 5, "expected": "00:00:00:04", "expectedFrameOffset": 4, "note": "6th packet repeats frame 4"},
+        {"start": "00:00:00:00", "offset": 6, "expected": "00:00:00:05", "expectedFrameOffset": 5},
+        {"start": "00:00:00:00", "offset": 11, "expected": "00:00:00:09", "expectedFrameOffset": 9, "note": "12th packet repeats frame 9"},
+        {"start": "00:00:00:00", "offset": 12, "expected": "00:00:00:10", "expectedFrameOffset": 10},
+        {"start": "00:00:00:00", "offset": 150, "expected": "00:00:05:00", "expectedFrameOffset": 125, "note": "150 packets = 125 frames = 5 seconds"}
+      ]
+    },
+    "29.97 NDF": {
+      "description": "29.97 Non-Drop Frame: 1:1 packet to frame mapping",
+      "tests": [
+        {"start": "00:00:00:00", "offset": 0, "expected": "00:00:00:00", "expectedFrameOffset": 0},
+        {"start": "00:00:00:00", "offset": 1, "expected": "00:00:00:01", "expectedFrameOffset": 1},
+        {"start": "00:00:00:00", "offset": 30, "expected": "00:00:01:00", "expectedFrameOffset": 30},
+        {"start": "00:00:00:29", "offset": 1, "expected": "00:00:01:00", "expectedFrameOffset": 1},
+        {"start": "00:00:59:29", "offset": 1, "expected": "00:01:00:00", "expectedFrameOffset": 1},
+        {"start": "00:59:59:29", "offset": 1, "expected": "01:00:00:00", "expectedFrameOffset": 1}
+      ]
+    },
+    "29.97 DF": {
+      "description": "29.97 Drop Frame: skips frames 0-1 at each minute except every 10th minute",
+      "tests": [
+        {"start": "00:00:00;00", "offset": 0, "expected": "00:00:00;00", "expectedFrameOffset": 0},
+        {"start": "00:00:00;00", "offset": 1, "expected": "00:00:00;01", "expectedFrameOffset": 1},
+        {"start": "00:00:59;29", "offset": 1, "expected": "00:01:00;02", "expectedFrameOffset": 1, "note": "Skip frames 0-1 at minute boundary"},
+        {"start": "00:01:59;29", "offset": 1, "expected": "00:02:00;02", "expectedFrameOffset": 1, "note": "Skip frames 0-1 at minute 2"},
+        {"start": "00:09:59;29", "offset": 1, "expected": "00:10:00;00", "expectedFrameOffset": 1, "note": "No skip at minute 10"},
+        {"start": "00:19:59;29", "offset": 1, "expected": "00:20:00;00", "expectedFrameOffset": 1, "note": "No skip at minute 20"}
+      ]
+    }
+  },
+  "frameRateDetectionTests": [
+    {
+      "content": "01:00:00:00\n01:00:00:23\n01:00:01:15",
+      "expected": "23.98",
+      "description": "Max frame 23 indicates 23.98 fps"
+    },
+    {
+      "content": "01:00:00:00\n01:00:00:24\n01:00:01:20",
+      "expected": "25",
+      "description": "Max frame 24 indicates 25 fps"
+    },
+    {
+      "content": "01:00:00;00\n01:00:00;29\n01:00:01;15",
+      "expected": "29.97 DF",
+      "description": "Semicolon separator indicates drop frame"
+    },
+    {
+      "content": "01:00:00:00\n01:00:00:29\n01:00:01:25",
+      "expected": "29.97 NDF",
+      "description": "Max frame 29 with colon indicates non-drop frame"
+    },
+    {
+      "content": "01:00:00:00\n01:00:00:30\n01:00:01:15",
+      "expected": "INVALID",
+      "description": "Frame 30 is invalid"
+    }
+  ],
+  "compareTests": [
+    {"ts1": "00:00:00:00", "ts2": "00:00:00:01", "expected": -1, "description": "ts1 < ts2"},
+    {"ts1": "00:00:00:01", "ts2": "00:00:00:00", "expected": 1, "description": "ts1 > ts2"},
+    {"ts1": "00:00:00:00", "ts2": "00:00:00:00", "expected": 0, "description": "ts1 == ts2"},
+    {"ts1": "01:00:00:00", "ts2": "00:59:59:29", "expected": 1, "description": "Hour difference"},
+    {"ts1": "00:01:00:00", "ts2": "00:00:59:29", "expected": 1, "description": "Minute difference"}
+  ]
+}

@@ -1,0 +1,148 @@
+{
+  "description": "Decoder test cases for SCC code parsing",
+  "characterTests": [
+    {"input": "c1c2", "expectedType": "TEXT", "expectedText": "AB"},
+    {"input": "8080", "expectedType": "NULL"},
+    {"input": "0000", "expectedType": "NULL"},
+    {"input": "9420", "expectedType": "CONTROL", "expectedCommand": "RCL"},
+    {"input": "942f", "expectedType": "CONTROL", "expectedCommand": "EOC"},
+    {"input": "942c", "expectedType": "CONTROL", "expectedCommand": "EDM"},
+    {"input": "94ae", "expectedType": "CONTROL", "expectedCommand": "ENM"},
+    {"input": "94a1", "expectedType": "CONTROL", "expectedCommand": "BS"},
+    {"input": "94a4", "expectedType": "CONTROL", "expectedCommand": "DER"},
+    {"input": "9425", "expectedType": "CONTROL", "expectedCommand": "RU2"},
+    {"input": "9426", "expectedType": "CONTROL", "expectedCommand": "RU3"},
+    {"input": "94a7", "expectedType": "CONTROL", "expectedCommand": "RU4"},
+    {"input": "942d", "expectedType": "CONTROL", "expectedCommand": "CR"},
+    {"input": "94a8", "expectedType": "CONTROL", "expectedCommand": "FON"},
+    {"input": "9429", "expectedType": "CONTROL", "expectedCommand": "RDC"},
+    {"input": "942a", "expectedType": "CONTROL", "expectedCommand": "TR"},
+    {"input": "94ab", "expectedType": "CONTROL", "expectedCommand": "RTD"}
+  ],
+  "controlCommandTests": {
+    "channel1": {
+      "prefix": "94",
+      "commands": ["20", "21", "24", "25", "26", "27", "28", "29", "2a", "2b", "2c", "2d", "2e", "2f"]
+    },
+    "channel2": {
+      "prefix": "1c",
+      "commands": ["20", "21", "24", "25", "26", "27", "28", "29", "2a", "2b", "2c", "2d", "2e", "2f"]
+    },
+    "channel3": {
+      "prefix": "15",
+      "commands": ["20", "21", "24", "25", "26", "27", "28", "29", "2a", "2b", "2c", "2d", "2e", "2f"]
+    },
+    "channel4": {
+      "prefix": "9d",
+      "commands": ["20", "21", "24", "25", "26", "27", "28", "29", "2a", "2b", "2c", "2d", "2e", "2f"]
+    }
+  },
+  "tabOffsetTests": [
+    {"input": "97a1", "expectedType": "INDENT", "expectedSpaces": 1},
+    {"input": "97a2", "expectedType": "INDENT", "expectedSpaces": 2},
+    {"input": "9723", "expectedType": "INDENT", "expectedSpaces": 3},
+    {"input": "1fa1", "expectedType": "INDENT", "expectedSpaces": 1},
+    {"input": "1fa2", "expectedType": "INDENT", "expectedSpaces": 2},
+    {"input": "1f23", "expectedType": "INDENT", "expectedSpaces": 3}
+  ],
+  "pairingTests": [
+    {
+      "line": "9420 9420",
+      "description": "Paired control commands",
+      "expectedPairs": [true, true]
+    },
+    {
+      "line": "9470 9470 9470",
+      "description": "Three identical codes - only first two pair",
+      "expectedPairs": [true, true, false]
+    },
+    {
+      "line": "c1c2 c1c2",
+      "description": "Text characters don't pair",
+      "expectedPairs": [false, false]
+    },
+    {
+      "line": "9420 9420 c1c2 9470 9470",
+      "description": "Mixed paired and unpaired",
+      "expectedPairs": [true, true, false, true, true]
+    }
+  ],
+  "lineDecodingTests": [
+    {
+      "line": "9420 9440 c8e5 6c6c ef80",
+      "expectedText": "Hello",
+      "description": "Basic text decoding"
+    },
+    {
+      "line": "9420 c1c2 c4c4",
+      "expectedText": "ABDD",
+      "description": "Multiple characters"
+    },
+    {
+      "line": "8080 8080",
+      "expectedText": "",
+      "description": "Null codes produce no text"
+    },
+    {
+      "line": "9420 9420 94ae 92a7",
+      "expectedText": "¡",
+      "description": "Special character"
+    },
+    {
+      "line": "9420 9137 9137",
+      "expectedText": "♪",
+      "description": "Music note special character"
+    },
+    {
+      "line": "942c 942f",
+      "expectedText": "",
+      "description": "Control only - no text"
+    }
+  ],
+  "pactests": [
+    {
+      "input": "9470",
+      "expectedType": "PAC",
+      "expectedRow": 15,
+      "expectedCol": 0,
+      "expectedColor": "White"
+    },
+    {
+      "input": "94d0",
+      "expectedType": "PAC",
+      "expectedRow": 4,
+      "expectedCol": 0,
+      "expectedColor": "White"
+    },
+    {
+      "input": "94f4",
+      "expectedType": "PAC",
+      "expectedRow": 4,
+      "expectedCol": 4,
+      "expectedColor": "White"
+    },
+    {
+      "input": "94ae",
+      "expectedType": "CONTROL",
+      "description": "94ae is ENM control, not PAC"
+    }
+  ],
+  "midrowTests": [
+    {
+      "input": "91ae",
+      "expectedType": "MIDROW",
+      "expectedColor": "Magenta"
+    },
+    {
+      "input": "91a0",
+      "expectedType": "MIDROW",
+      "expectedColor": "White"
+    }
+  ],
+  "parityErrorTests": [
+    {"input": "9520", "expectedType": "ERROR", "description": "Invalid parity in first byte"},
+    {"input": "9421", "expectedType": "ERROR", "description": "Invalid parity in second byte"},
+    {"input": "0020", "expectedType": "ERROR", "description": "No parity bits set"},
+    {"input": "FF20", "expectedType": "ERROR", "description": "Invalid high bits"}
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "SCC",
+  "scopeName": "source.scc",
+  "patterns": [
+    {
+      "name": "meta.header.scc",
+      "match": "^Scenarist_SCC V1\\.0$",
+      "comment": "SCC file header"
+    },
+    {
+      "name": "constant.numeric.timestamp.scc",
+      "match": "^\\d{2}:\\d{2}:\\d{2}[:;]\\d{2}",
+      "comment": "Timestamps at line start"
+    },
+    {
+      "name": "comment.other.null.scc",
+      "match": "\\b8080\\b",
+      "comment": "Null/filler codes"
+    },
+    {
+      "name": "keyword.control.caption.scc",
+      "match": "\\b(942[0cf]|942[5-9]|942[a-f]|94a[1-9]|94a[b-d]|1c2[0cf]|1c2[5-9]|1c2[a-f]|1ca[1-9]|1ca[b-d]|152[0cf]|152[5-9]|152[a-f]|15a[1-9]|15a[b-d]|9d2[0cf]|9d2[5-9]|9d2[a-f]|9da[1-9]|9da[b-d])\\b",
+      "comment": "Caption control codes (RCL, EOC, EDM, ENM, etc.)"
+    },
+    {
+      "name": "entity.name.tag.pac.scc",
+      "match": "\\b(9[04][1-7][0-9a-f]|1[c5][1-7][0-9a-f]|9d[1-7][0-9a-f])\\b",
+      "comment": "Preamble Address Codes (PAC)"
+    },
+    {
+      "name": "constant.character.tab-offset.scc",
+      "match": "\\b(97[2a][1-3]|1f[2a][1-3])\\b",
+      "comment": "Tab offset codes"
+    },
+    {
+      "name": "markup.italic.midrow.scc",
+      "match": "\\b(91[2a][2-9e]|91[2a][a-f]|19[2a][2-9e]|19[2a][a-f])\\b",
+      "comment": "Mid-row codes (style changes)"
+    },
+    {
+      "name": "constant.other.hex.scc",
+      "match": "\\b[0-9a-fA-F]{4}\\b",
+      "comment": "General hex words"
+    }
+  ]
+}

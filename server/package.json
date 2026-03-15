@@ -1,0 +1,26 @@
+{
+  "name": "scc-language-server",
+  "version": "0.1.0",
+  "description": "LSP server for SCC (Scenarist Closed Caption) files",
+  "main": "./out/server.js",
+  "bin": {
+    "scc-language-server": "./out/server.js"
+  },
+  "scripts": {
+    "compile": "tsc -b",
+    "watch": "tsc -b -w",
+    "test": "mocha out/test/**/*.test.js"
+  },
+  "dependencies": {
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.11",
+    "vscode-languageserver-protocol": "^3.17.5"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.0",
+    "@types/node": "^20.10.0",
+    "mocha": "^10.2.0",
+    "typescript": "^5.3.0"
+  },
+  "license": "MIT"
+}
