@@ -10,7 +10,7 @@ import {
 let client: LanguageClient;
 
 export function activate(context: ExtensionContext) {
-    const serverModule = context.asPath(
+    const serverModule = context.asAbsolutePath(
         path.join('server', 'out', 'server.js')
     );
 

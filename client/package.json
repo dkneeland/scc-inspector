@@ -53,7 +53,8 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -b",
-    "watch": "tsc -b -w"
+    "watch": "tsc -b -w",
+    "test": "echo \"No tests yet\""
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1",

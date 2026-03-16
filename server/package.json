@@ -9,7 +9,7 @@
   "scripts": {
     "compile": "tsc -b",
     "watch": "tsc -b -w",
-    "test": "mocha out/test/**/*.test.js"
+    "test": "mocha --ui tdd test/**/*.test.js"
   },
   "dependencies": {
     "vscode-languageserver": "^9.0.1",

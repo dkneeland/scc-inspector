@@ -6,7 +6,7 @@
  */
 
 import * as path from 'path';
-import { TIMESTAMP_PATTERN } from './decoder';
+import { TIMESTAMP_PATTERN } from './sccDecoder';
 
 // Load shared frame rate config
 const frameRatesData = require(path.join(__dirname, '../data/frame_rates.json'));

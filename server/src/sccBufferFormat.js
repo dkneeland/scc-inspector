@@ -1,36 +1,28 @@
+"use strict";
 /**
  * SCC Buffer Format Module
  *
  * Fast single-pass annotation rendering.
  */
-
-import { iterHexWords, parseSccCode, DecodeEvent } from './sccDecoder';
-
-export interface AnnotationSegment {
-    text: string;
-    isItalic: boolean;
-}
-
-export function renderLineAnnotation(lineText: string): AnnotationSegment[] {
-    const segments: AnnotationSegment[] = [];
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.renderLineAnnotation = renderLineAnnotation;
+const sccDecoder_1 = require("./sccDecoder");
+function renderLineAnnotation(lineText) {
+    const segments = [];
     let currentText = '';
     let isItalic = false;
     let hasContent = false;
-    
-    for (const word of iterHexWords(lineText)) {
+    for (const word of (0, sccDecoder_1.iterHexWords)(lineText)) {
         // Skip second of paired codes
         if (word.isPaired && word.start > word.pairStart) {
             continue;
         }
-        
-        const evt = parseSccCode(word.text, word.isPaired);
-        
+        const evt = (0, sccDecoder_1.parseSccCode)(word.text, word.isPaired);
         switch (evt.type) {
             case 'TEXT':
                 currentText += evt.text || '';
                 hasContent = true;
                 break;
-                
             case 'PAC':
                 if (currentText) {
                     segments.push({ text: currentText, isItalic });
@@ -42,7 +34,6 @@ export function renderLineAnnotation(lineText: string): AnnotationSegment[] {
                 isItalic = evt.isItalic || false;
                 hasContent = true;
                 break;
-                
             case 'MIDROW':
                 if (currentText) {
                     segments.push({ text: currentText, isItalic });
@@ -51,12 +42,10 @@ export function renderLineAnnotation(lineText: string): AnnotationSegment[] {
                 isItalic = evt.isItalic || false;
                 hasContent = true;
                 break;
-                
             case 'INDENT':
                 currentText += ' '.repeat(evt.spaces || 0);
                 hasContent = true;
                 break;
-                
             case 'CONTROL':
                 if (evt.isBackspace && currentText) {
                     currentText = currentText.slice(0, -1);
@@ -64,10 +53,9 @@ export function renderLineAnnotation(lineText: string): AnnotationSegment[] {
                 break;
         }
     }
-    
     if (currentText) {
         segments.push({ text: currentText, isItalic });
     }
-    
     return hasContent ? segments : [];
 }
+//# sourceMappingURL=sccBufferFormat.js.map

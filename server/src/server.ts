@@ -14,8 +14,7 @@ import {
 } from 'vscode-languageserver/node';
 
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { SccDecoder } from './sccDecoder';
-import { SccTimecode } from './sccTimecode';
+import { parseSccCode } from './sccDecoder';
 
 const connection = createConnection(ProposedFeatures.all);
 const documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
@@ -123,20 +122,26 @@ connection.onHover(
             const end = start + 4;
             if (position.character >= start && position.character <= end) {
                 const code = match[0].toUpperCase();
-                const decoded = SccDecoder.decodeSingleCode(code);
+                const decoded = parseSccCode(code);
                 
                 if (decoded) {
                     hoverContent = `**${code}**\n\n`;
-                    if (decoded.type === 'text') {
-                        hoverContent += `Character: \`${decoded.char}\``;
-                    } else if (decoded.type === 'control') {
+                    if (decoded.type === 'TEXT') {
+                        hoverContent += `Text: \`${decoded.text}\``;
+                    } else if (decoded.type === 'CONTROL') {
                         hoverContent += `Control: \`${decoded.name}\``;
-                    } else if (decoded.type === 'pac') {
+                    } else if (decoded.type === 'PAC') {
                         hoverContent += `PAC: Row ${decoded.row}, Col ${decoded.col}, ${decoded.color}`;
-                    } else if (decoded.type === 'midrow') {
-                        hoverContent += `Midrow: ${decoded.color}${decoded.italic ? ', Italic' : ''}`;
-                    } else if (decoded.type === 'paired') {
-                        hoverContent += `Paired: ${decoded.name}`;
+                    } else if (decoded.type === 'MIDROW') {
+                        hoverContent += `Midrow: ${decoded.color}${decoded.underline ? ', Underline' : ''}`;
+                    } else if (decoded.type === 'INDENT') {
+                        hoverContent += `Tab Offset: ${decoded.spaces} spaces`;
+                    } else if (decoded.type === 'NULL') {
+                        hoverContent += `Null / Padding`;
+                    } else if (decoded.type === 'ERROR') {
+                        hoverContent += `**Error**: ${decoded.desc}`;
+                    } else {
+                        hoverContent += `Unknown code`;
                     }
                 }
                 break;

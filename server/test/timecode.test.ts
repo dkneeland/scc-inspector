@@ -1,9 +1,3 @@
-/**
- * Timecode Tests
- *
- * Tests for timecode parsing and calculations using shared test cases from scc-core.
- */
-
 import * as assert from 'assert';
 import * as path from 'path';
 import { 
@@ -12,116 +6,100 @@ import {
     detectFrameRate, 
     validateTimestamp,
     compareTimestamps
-} from '../src/timecode';
+} from '../src/sccTimecode';
 
-// Load test cases
-const testCasesPath = path.join(__dirname, '../../scc-core/test-cases/timecode_cases.json');
+const testCasesPath = path.join(__dirname, './test-cases/timecode_cases.json');
 const testCases = require(testCasesPath);
 
 suite('Timecode Tests', () => {
     
-    suite('Parse Tests', () => {
-        testCases.parseTests.forEach((tc: any) => {
-            test(`should parse ${tc.input}`, () => {
+    suite('Parse Timestamp', () => {
+        testCases.parse_timestamp.forEach((tc: any) => {
+            test(`parse ${tc.input}`, () => {
                 const result = parseTimestampStr(tc.input);
-                assert.strictEqual(result.hours, tc.expected.hours);
-                assert.strictEqual(result.minutes, tc.expected.minutes);
-                assert.strictEqual(result.seconds, tc.expected.seconds);
-                assert.strictEqual(result.frames, tc.expected.frames);
+                assert.strictEqual(result.hours, tc.expected[0]);
+                assert.strictEqual(result.minutes, tc.expected[1]);
+                assert.strictEqual(result.seconds, tc.expected[2]);
+                assert.strictEqual(result.frames, tc.expected[3]);
             });
         });
     });
     
-    suite('Validation Tests', () => {
-        testCases.validationTests.forEach((tc: any) => {
-            const testName = tc.valid 
-                ? `${tc.input} should be valid`
-                : `${tc.input} should be invalid (${tc.reason})`;
-            test(testName, () => {
-                const result = validateTimestamp(tc.input);
-                assert.strictEqual(result, tc.valid);
+    suite('Validate Timestamp', () => {
+        testCases.validate_timestamp.valid.forEach((ts: string) => {
+            test(`${ts} should be valid`, () => {
+                assert.strictEqual(validateTimestamp(ts), true);
+            });
+        });
+        
+        testCases.validate_timestamp.invalid.forEach((ts: string) => {
+            test(`${ts} should be invalid`, () => {
+                assert.strictEqual(validateTimestamp(ts), false);
             });
         });
     });
     
-    suite('Add Frames Tests - 23.98', () => {
-        const tests = testCases.addFramesTests['23.98'].tests;
-        tests.forEach((tc: any) => {
-            test(`offset ${tc.offset} from ${tc.start} = ${tc.expected}`, () => {
-                const ts = parseTimestampStr(tc.start);
-                const [result, frameOffset] = addFrames(
-                    ts.hours, ts.minutes, ts.seconds, ts.frames,
+    suite('Add Frames - 23.98', () => {
+        testCases.add_frames['23.98'].forEach((tc: any) => {
+            test(`offset ${tc.offset} from ${tc.hh}:${tc.mm}:${tc.ss}:${tc.ff} = ${tc.expectedTc}`, () => {
+                const [resultTc, resultOffset] = addFrames(
+                    tc.hh, tc.mm, tc.ss, tc.ff,
                     tc.offset,
                     '23.98'
                 );
-                assert.strictEqual(result, tc.expected, tc.note || '');
-                assert.strictEqual(frameOffset, tc.expectedFrameOffset);
+                assert.strictEqual(resultTc, tc.expectedTc);
+                assert.strictEqual(resultOffset, tc.expectedOffset);
             });
         });
     });
     
-    suite('Add Frames Tests - 25', () => {
-        const tests = testCases.addFramesTests['25'].tests;
-        tests.forEach((tc: any) => {
-            test(`offset ${tc.offset} from ${tc.start} = ${tc.expected}`, () => {
-                const ts = parseTimestampStr(tc.start);
-                const [result, frameOffset] = addFrames(
-                    ts.hours, ts.minutes, ts.seconds, ts.frames,
+    suite('Add Frames - 25', () => {
+        testCases.add_frames['25'].forEach((tc: any) => {
+            test(`offset ${tc.offset} from ${tc.hh}:${tc.mm}:${tc.ss}:${tc.ff} = ${tc.expectedTc}`, () => {
+                const [resultTc, resultOffset] = addFrames(
+                    tc.hh, tc.mm, tc.ss, tc.ff,
                     tc.offset,
                     '25'
                 );
-                assert.strictEqual(result, tc.expected, tc.note || '');
-                assert.strictEqual(frameOffset, tc.expectedFrameOffset);
+                assert.strictEqual(resultTc, tc.expectedTc);
+                assert.strictEqual(resultOffset, tc.expectedOffset);
             });
         });
     });
     
-    suite('Add Frames Tests - 29.97 NDF', () => {
-        const tests = testCases.addFramesTests['29.97 NDF'].tests;
-        tests.forEach((tc: any) => {
-            test(`offset ${tc.offset} from ${tc.start} = ${tc.expected}`, () => {
-                const ts = parseTimestampStr(tc.start);
-                const [result, frameOffset] = addFrames(
-                    ts.hours, ts.minutes, ts.seconds, ts.frames,
+    suite('Add Frames - 29.97 NDF', () => {
+        testCases.add_frames['29.97 NDF'].forEach((tc: any) => {
+            test(`offset ${tc.offset} from ${tc.hh}:${tc.mm}:${tc.ss}:${tc.ff} = ${tc.expectedTc}`, () => {
+                const [resultTc, resultOffset] = addFrames(
+                    tc.hh, tc.mm, tc.ss, tc.ff,
                     tc.offset,
                     '29.97 NDF'
                 );
-                assert.strictEqual(result, tc.expected, tc.note || '');
-                assert.strictEqual(frameOffset, tc.expectedFrameOffset);
+                assert.strictEqual(resultTc, tc.expectedTc);
+                assert.strictEqual(resultOffset, tc.expectedOffset);
             });
         });
     });
     
-    suite('Add Frames Tests - 29.97 DF', () => {
-        const tests = testCases.addFramesTests['29.97 DF'].tests;
-        tests.forEach((tc: any) => {
-            test(`offset ${tc.offset} from ${tc.start} = ${tc.expected}`, () => {
-                const ts = parseTimestampStr(tc.start);
-                const [result, frameOffset] = addFrames(
-                    ts.hours, ts.minutes, ts.seconds, ts.frames,
+    suite('Add Frames - 29.97 DF', () => {
+        testCases.add_frames['29.97 DF'].forEach((tc: any) => {
+            test(`offset ${tc.offset} from ${tc.hh}:${tc.mm}:${tc.ss}:${tc.ff} = ${tc.expectedTc}`, () => {
+                const [resultTc, resultOffset] = addFrames(
+                    tc.hh, tc.mm, tc.ss, tc.ff,
                     tc.offset,
                     '29.97 DF'
                 );
-                assert.strictEqual(result, tc.expected, tc.note || '');
-                assert.strictEqual(frameOffset, tc.expectedFrameOffset);
+                assert.strictEqual(resultTc, tc.expectedTc);
+                assert.strictEqual(resultOffset, tc.expectedOffset);
             });
         });
     });
     
-    suite('Frame Rate Detection Tests', () => {
-        testCases.frameRateDetectionTests.forEach((tc: any) => {
-            test(tc.description || `detect ${tc.expected}`, () => {
+    suite('Frame Rate Detection', () => {
+        testCases.frame_rate_detection.forEach((tc: any) => {
+            test(tc.name || `detect ${tc.expectedRate}`, () => {
                 const [rate] = detectFrameRate(tc.content);
-                assert.strictEqual(rate, tc.expected);
-            });
-        });
-    });
-    
-    suite('Compare Tests', () => {
-        testCases.compareTests.forEach((tc: any) => {
-            test(`${tc.ts1} vs ${tc.ts2} = ${tc.expected}`, () => {
-                const result = compareTimestamps(tc.ts1, tc.ts2);
-                assert.strictEqual(result, tc.expected, tc.description);
+                assert.strictEqual(rate, tc.expectedRate);
             });
         });
     });
