@@ -3,3 +3,5 @@ out/
 *.vsix
 .vscode-test/
 .agents.md
+samples/AH*.scc
+*.tsbuildinfo
