@@ -752,6 +752,8 @@ This file has:
 
 **Goal:** Enrich the existing hover to show buffer state, timing context, and overflow warnings — turning a simple decode into a full debugging tool.
 
+> **Design note — hover anchoring:** The original Notepad++ plugin used Scintilla's `callTipShow(position, text)` API, which pins the tooltip to a fixed character position (the timestamp) regardless of where the mouse is. VS Code's LSP hover always follows the cursor. The current implementation anchors the hover range to the hovered hex word, which is an improvement over anchoring to the timestamp, but still doesn't fully replicate the fixed-pin feel. Revisit this in a later pass — options include a custom Webview side panel that updates as the cursor moves (closest to the original), or InlayHints for persistent decoded text. For now the per-word hover range is the pragmatic choice.
+
 ### Step 3.1: Enhance the `onHover` Handler
 
 The current `onHover` in `server.ts` decodes the hex code under the cursor and returns a basic Markdown string. Enhance it to include:

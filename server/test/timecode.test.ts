@@ -6,7 +6,7 @@ import {
     detectFrameRate, 
     validateTimestamp,
     compareTimestamps
-} from '../src/sccTimecode';
+} from '../out/sccTimecode';
 
 const testCasesPath = path.join(__dirname, './test-cases/timecode_cases.json');
 const testCases = require(testCasesPath);

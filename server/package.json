@@ -9,7 +9,8 @@
   "scripts": {
     "compile": "tsc -b",
     "watch": "tsc -b -w",
-    "test": "mocha --ui tdd test/**/*.test.js"
+    "compile-tests": "tsc test/analyzer.test.ts test/decoder.test.ts test/timecode.test.ts --outDir test --esModuleInterop --module commonjs --target ES2020 --resolveJsonModule",
+    "test": "npm run compile-tests && mocha --ui tdd test/**/*.test.js"
   },
   "dependencies": {
     "vscode-languageserver": "^9.0.1",

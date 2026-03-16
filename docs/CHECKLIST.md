@@ -23,26 +23,26 @@ Quick-reference checklist for tracking progress. Each item references the detail
 > Details: docs/EXECUTION_GUIDE.md → Phase 1
 
 ### Implementation
-- [ ] `server/src/sccAnalyzer.ts` created with `SccDocument` class (Step 1.1)
-- [ ] `analyze()` — single-pass state machine builds `timestampMap`, `timeMap`, `lineTexts` (Step 1.1)
-- [ ] `getBufferSnapshot()` — backwards scan reconstructs buffer state (Step 1.1)
-- [ ] `checkOverflow()` — detects packets exceeding next timestamp (Step 1.1)
-- [ ] `SccDocument` wired into `server.ts` on document open/change/close (Step 1.2)
+- [x] `server/src/sccAnalyzer.ts` created with `SccDocument` class (Step 1.1)
+- [x] `analyze()` — single-pass state machine builds `timestampMap`, `timeMap`, `lineTexts` (Step 1.1)
+- [x] `getBufferSnapshot()` — backwards scan reconstructs buffer state (Step 1.1)
+- [x] `checkOverflow()` — detects packets exceeding next timestamp (Step 1.1)
+- [x] `SccDocument` wired into `server.ts` on document open/change/close (Step 1.2)
 
 ### Tests
-- [ ] `server/test/analyzer.test.ts` created (Step 1.3)
-- [ ] `server/test/test-cases/analyzer_cases.json` created (Step 1.3)
-- [ ] Time map tests: basic pop-on, EDM end time, multiple blocks, ENM clears pending (Step 1.3)
-- [ ] Buffer snapshot tests: single line, PAC formatting, backwards scan, ENM stops scan (Step 1.3)
-- [ ] Overflow tests: no overflow, overflow detected, last line safe (Step 1.3)
-- [ ] Integration test against `big-buck-bunny.scc` (Step 1.3)
+- [x] `server/test/analyzer.test.ts` created (Step 1.3)
+- [x] `server/test/test-cases/analyzer_cases.json` created (Step 1.3)
+- [x] Time map tests: basic pop-on, EDM end time, multiple blocks, ENM clears pending (Step 1.3)
+- [x] Buffer snapshot tests: single line, PAC formatting, backwards scan, ENM stops scan (Step 1.3)
+- [x] Overflow tests: no overflow, overflow detected, last line safe (Step 1.3)
+- [x] Integration test against `big-buck-bunny.scc` (Step 1.3)
 
 ### Edge Cases
-- [ ] Windows line endings (`\r\n`) handled (Step 1.4)
-- [ ] Null-only lines not added to `pendingLines` (Step 1.4)
-- [ ] Semicolon timestamps (drop frame) handled (Step 1.4)
-- [ ] Header line skipped (Step 1.4)
-- [ ] All prior tests still pass (Step 1.4)
+- [x] Windows line endings (`\r\n`) handled (Step 1.4)
+- [x] Null-only lines not added to `pendingLines` (Step 1.4)
+- [x] Semicolon timestamps (drop frame) handled (Step 1.4)
+- [x] Header line skipped (Step 1.4)
+- [x] All prior tests still pass (Step 1.4)
 
 ---
 

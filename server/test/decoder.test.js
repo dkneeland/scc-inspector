@@ -35,7 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 const assert = __importStar(require("assert"));
 const path = __importStar(require("path"));
-const sccDecoder_1 = require("../src/sccDecoder");
+const sccDecoder_1 = require("../out/sccDecoder");
 const testCasesPath = path.join(__dirname, './test-cases/decoder_cases.json');
 const testCases = require(testCasesPath);
 suite('Decoder Tests', () => {
@@ -182,4 +182,3 @@ suite('Decoder Tests', () => {
         });
     });
 });
-//# sourceMappingURL=decoder.test.js.map

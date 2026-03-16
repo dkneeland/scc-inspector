@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import * as path from 'path';
-import { parseSccCode, iterHexWords, decodeSingleCode, HEX_PATTERN, isPairingCommand } from '../src/sccDecoder';
+import { parseSccCode, iterHexWords, decodeSingleCode, HEX_PATTERN, isPairingCommand } from '../out/sccDecoder';
 
 const testCasesPath = path.join(__dirname, './test-cases/decoder_cases.json');
 const testCases = require(testCasesPath);

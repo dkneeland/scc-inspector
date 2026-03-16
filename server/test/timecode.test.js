@@ -35,7 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 const assert = __importStar(require("assert"));
 const path = __importStar(require("path"));
-const sccTimecode_1 = require("../src/sccTimecode");
+const sccTimecode_1 = require("../out/sccTimecode");
 const testCasesPath = path.join(__dirname, './test-cases/timecode_cases.json');
 const testCases = require(testCasesPath);
 suite('Timecode Tests', () => {
@@ -107,4 +107,3 @@ suite('Timecode Tests', () => {
         });
     });
 });
-//# sourceMappingURL=timecode.test.js.map
