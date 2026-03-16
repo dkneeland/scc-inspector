@@ -70,6 +70,106 @@ The server is published as an npm package (`scc-language-server`) with a `bin` e
 
 ---
 
+## How to Test & See Your Work
+
+VS Code extensions are developed and tested using a special workflow called the **Extension Development Host**. This is a second VS Code window that runs your extension in isolation — you don't need to install or publish anything to see it work. Here's everything you need to know.
+
+### First-Time Setup (do this once)
+
+```bash
+cd C:\PythonProjects\scc-language-server
+npm install          # Install all dependencies (root, client, server)
+npm run compile      # Build TypeScript -> JavaScript
+```
+
+If `npm install` fails on the workspace resolution for `scc-language-server`, that's because the client references the server package by name. You may need to run `npm install` in `server/` and `client/` separately, or adjust the workspace config. We'll sort this out when we get there.
+
+### The F5 Workflow (your daily testing loop)
+
+This is the core loop you'll use constantly:
+
+1. **Open the project folder** in VS Code: `File > Open Folder > C:\PythonProjects\scc-language-server`
+2. **Create the launch config** (one-time). You need a `.vscode/launch.json` — we'll create this as part of Phase 1. It tells VS Code how to start the Extension Development Host.
+3. **Press F5** (or `Run > Start Debugging`). This opens a **second VS Code window** with a `[Extension Development Host]` label in the title bar. Your extension is loaded and active in this window only.
+4. **Open an SCC file** in the Extension Development Host window — use `samples/big-buck-bunny.scc` from this project.
+5. **See your features working** — hover over hex codes, see syntax highlighting, check for error squiggles, etc.
+6. **Make code changes** in the original window, then:
+   - `Ctrl+Shift+F5` to restart the Extension Development Host (picks up changes after recompile)
+   - Or just close the Extension Development Host and press F5 again
+7. **Check the Output panel** in the original window for server logs. Select "SCC Inspector" from the output channel dropdown to see LSP server messages.
+
+> **Key mental model:** You always have two VS Code windows open. The *first* window is where you edit code. The *second* window (Extension Development Host) is where you test the extension by opening SCC files. They are completely separate — installing extensions, changing settings, etc. in the dev host doesn't affect your real VS Code.
+
+### What You Can See at Each Phase
+
+This is the important part — when does it stop being "just code" and start being something you can visually interact with?
+
+| Phase | What You'll See in the Extension Development Host |
+|-------|--------------------------------------------------|
+| **Right now** (pre-Phase 1) | Syntax highlighting on `.scc` files (colors on timestamps, hex codes). Basic hover tooltips showing decoded hex codes. That's it — but it proves the LSP connection works. |
+| **After Phase 1** | No new visual changes yet. Phase 1 is internal plumbing (state machine). You can verify it works by running `npm test`. |
+| **After Phase 2** | **First big visual payoff.** Red/yellow squiggly underlines appear on errors in SCC files — parity errors, bad timestamps, buffer overflow. These show up in the Problems panel (`Ctrl+Shift+M`) too. This is the moment it starts feeling like a real tool. |
+| **After Phase 3** | Hover tooltips become rich — they show the current buffer state, timing info, and context. Hover over any hex code and you see a formatted Markdown popup. |
+| **After Phase 4** | **The "wow" moment.** Decoded caption text appears at the end of every SCC line in dimmed text, like `"Big Buck Bunny" [00:01:23:00 → 00:01:26:15]`. This is the signature feature from the original plugin, now in VS Code. |
+| **After Phase 5** | Code lenses appear above caption blocks showing timing. The Outline panel (`Ctrl+Shift+O`) shows caption blocks. |
+| **After Phase 6** | You can install it from the Marketplace like any other extension. Others can use it. |
+
+### Debugging Tips
+
+- **"My extension isn't activating"** — Make sure the file you opened in the dev host has a `.scc` extension. The extension only activates for SCC files.
+- **"I changed code but nothing changed"** — Did you recompile? Run `npm run compile` or use `npm run watch` (runs in the background, recompiles on save). Then restart the dev host with `Ctrl+Shift+F5`.
+- **"I see errors in the Debug Console"** — The Debug Console in your main VS Code window shows server-side errors. This is where crashes and unhandled exceptions appear.
+- **"Where are the server logs?"** — In the Extension Development Host window: `View > Output`, then select "SCC Inspector" from the dropdown. You can add `connection.console.log("...")` in server.ts to print here.
+- **Watch mode**: Run `npm run watch` in a terminal. This recompiles automatically when you save a `.ts` file, so you only need to restart the dev host (Ctrl+Shift+F5), not manually recompile.
+
+### Running Unit Tests (no VS Code needed)
+
+Unit tests run in the terminal — no Extension Development Host required:
+
+```bash
+cd C:\PythonProjects\scc-language-server
+npm test                    # Runs all tests across workspaces
+cd server && npm test       # Runs just the server tests (decoder, timecode, etc.)
+```
+
+Tests use Mocha with the TDD interface. You'll see output like:
+```
+  SCC Decoder
+    standard characters
+      ✓ 0x20 → space
+      ✓ 0x21 → !
+      ...
+    48 passing (12ms)
+```
+
+### The Launch Config You'll Need
+
+We'll create this file as part of Phase 1, but for reference, this is what `.vscode/launch.json` looks like for an LSP extension:
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "runtimeExecutable": "${execPath}",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/client"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/client/out/**/*.js",
+        "${workspaceFolder}/server/out/**/*.js"
+      ],
+      "preLaunchTask": "npm: compile"
+    }
+  ]
+}
+```
+
+---
+
 ## Phased Rollout
 
 ### Phase 1: Buffer State Machine (`sccAnalyzer.ts`)
@@ -87,6 +187,8 @@ The server is published as an npm package (`scc-language-server`) with a `bin` e
 - [ ] Remove the original 1000-line scan depth limit (no longer needed without UI-thread concerns)
 - [ ] Port buffer-related test cases from Python to TypeScript
 - [ ] All existing tests continue to pass
+
+**What you'll see:** No visible changes in the Extension Development Host — this is internal plumbing. Verify it works by running `npm test` and seeing new buffer/analyzer test cases pass. This is the "trust the process" phase.
 
 **Why this is Phase 1:** Every subsequent feature depends on the state machine. Diagnostics need `time_map` to find errors. Annotations need it to show decoded text. Tooltips need `build_buffer_snapshot` for buffer context.
 
@@ -110,6 +212,8 @@ The server is published as an npm package (`scc-language-server`) with a `bin` e
 - [ ] Re-publish diagnostics on document change
 - [ ] Add diagnostic test cases
 
+**What you'll see:** Open `big-buck-bunny.scc` in the dev host and you'll see red and yellow squiggly underlines on problematic lines. Open the Problems panel (`Ctrl+Shift+M`) to see a list of all errors/warnings with descriptions. Click any problem to jump to that line. **This is the first phase where the tool visually does something useful.**
+
 **Why this is Phase 2:** Diagnostics are the highest-value LSP feature — they provide passive, always-on error detection without any user interaction. This is where LSP immediately surpasses the original Notepad++ plugin (which only showed errors after a manual refresh).
 
 ---
@@ -125,6 +229,8 @@ The server is published as an npm package (`scc-language-server`) with a `bin` e
   - Caption display timing (when it appears, when it's erased)
 - [ ] Format tooltips as Markdown with monospace buffer display
 - [ ] Handle edge cases: hover on timestamps, hover on header line, hover on empty lines
+
+**What you'll see:** Hover over any hex code and instead of a bare decode, you'll see a rich Markdown popup showing: what the code means, what's currently in the caption buffer at that point, timing info, and warnings. It's like having a debugger for captions.
 
 **Why this is Phase 3:** The basic hover already works. This phase enriches it with buffer context (which requires Phase 1's state machine).
 
@@ -142,6 +248,8 @@ The server is published as an npm package (`scc-language-server`) with a `bin` e
 - [ ] Update annotations on document change (debounced)
 - [ ] Add configuration toggle: `sccInspector.showAnnotations` (default: true)
 
+**What you'll see:** Every SCC line gets dimmed text appended at the end showing the decoded caption. A line like `00:01:23:00  94ad 94ad 9470 9470 c865 ecec ef` will show `→ "Hello" [00:01:23:00 → 00:01:26:15]` in gray after it. This transforms the file from inscrutable hex into readable captions at a glance. **This is the "wow" moment.**
+
 **Why this is Phase 4:** Annotations are the signature UX feature of the original plugin, but they require client-side decoration APIs that are editor-specific. The server provides the data; the client renders it. This is where the VS Code client diverges from a pure-LSP implementation.
 
 ---
@@ -158,6 +266,8 @@ The server is published as an npm package (`scc-language-server`) with a `bin` e
 - [ ] Add `sccInspector.frameRateOverride` setting (for files where auto-detect fails)
 - [ ] Add `textDocument/documentSymbol` — outline view showing caption blocks with timestamps
 - [ ] Semantic token provider for richer highlighting (colors matching caption colors, etc.)
+
+**What you'll see:** Small text labels appear above caption blocks in the editor showing frame rate, duration, and gaps. The Outline panel shows a navigable list of caption blocks by timestamp — click to jump.
 
 ---
 
