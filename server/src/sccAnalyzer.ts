@@ -382,10 +382,12 @@ export class SccDocument {
             logicalIdx++;
         }
 
+        const formatted = this._formatBuffer(bufText, initialState);
+        const prefixLen = formatted.length - bufText.length;
         return {
-            bufferText: this._formatBuffer(bufText, initialState),
-            highlightStart,
-            highlightEnd
+            bufferText: formatted,
+            highlightStart: highlightStart >= 0 ? highlightStart + prefixLen : -1,
+            highlightEnd: highlightEnd >= 0 ? highlightEnd + prefixLen : -1
         };
     }
 

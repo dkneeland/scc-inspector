@@ -190,10 +190,12 @@ connection.onHover(
 
         const snapshot = sccDoc.getBufferSnapshot(position.line, logicalIdx);
         if (snapshot.bufferText) {
-            hoverContent += '\n\n---\n\n**BUF:**\n```\n' + snapshot.bufferText + '\n```';
             if (snapshot.highlightStart >= 0 && snapshot.highlightEnd > snapshot.highlightStart) {
-                const caretLine = ' '.repeat(snapshot.highlightStart) + '^'.repeat(snapshot.highlightEnd - snapshot.highlightStart);
-                hoverContent += '\n```\n' + caretLine + '\n```';
+                const caretLine = ' '.repeat(snapshot.highlightStart)
+                    + '^'.repeat(snapshot.highlightEnd - snapshot.highlightStart);
+                hoverContent += '\n\n---\n\n**BUF:**\n```\n' + snapshot.bufferText + '\n' + caretLine + '\n```';
+            } else {
+                hoverContent += '\n\n---\n\n**BUF:**\n```\n' + snapshot.bufferText + '\n```';
             }
         }
 

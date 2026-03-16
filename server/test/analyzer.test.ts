@@ -272,6 +272,62 @@ Some line without timestamp
             assert.strictEqual(snapshot.highlightStart, -1);
             assert.strictEqual(snapshot.highlightEnd, -1);
         });
+
+        test('highlight indices account for PAC prefix', () => {
+            const doc = new SccDocument();
+            const input = `Scenarist_SCC V1.0
+
+00:00:01:00\t9420 9420 94f4 94f4 c8e5`;
+            
+            doc.analyze(input);
+            const snapshot = doc.getBufferSnapshot(2, 2);
+            
+            const prefixEnd = snapshot.bufferText.indexOf('}') + 1;
+            assert.ok(prefixEnd > 0, 'should have a prefix');
+            assert.ok(snapshot.highlightStart >= prefixEnd, 'highlightStart should be after prefix');
+            assert.ok(snapshot.highlightEnd > snapshot.highlightStart, 'highlightEnd should be after highlightStart');
+        });
+
+        test('highlight starts at 0 when no PAC prefix', () => {
+            const doc = new SccDocument();
+            const input = `Scenarist_SCC V1.0
+
+00:00:01:00\t9420 9420 c8e5`;
+            
+            doc.analyze(input);
+            const snapshot = doc.getBufferSnapshot(2, 1);
+            
+            assert.ok(snapshot.bufferText.startsWith('H'), 'buffer should start with H (no prefix)');
+            assert.strictEqual(snapshot.highlightStart, 0, 'highlightStart should be 0 with no prefix');
+        });
+
+        test('PAC as target word highlights PAC string in buffer', () => {
+            const doc = new SccDocument();
+            const input = `Scenarist_SCC V1.0
+
+00:00:01:00\t9420 9420 94f4`;
+            
+            doc.analyze(input);
+            const snapshot = doc.getBufferSnapshot(2, 1);
+            
+            const highlighted = snapshot.bufferText.substring(snapshot.highlightStart, snapshot.highlightEnd);
+            assert.ok(highlighted.includes('R14'), 'highlighted text should include row info');
+        });
+
+        test('second text word highlight after prefix', () => {
+            const doc = new SccDocument();
+            const input = `Scenarist_SCC V1.0
+
+00:00:01:00\t9420 9420 94f4 94f4 c8e5 ecec`;
+            
+            doc.analyze(input);
+            const snapshot = doc.getBufferSnapshot(2, 3);
+            
+            const prefixEnd = snapshot.bufferText.indexOf('}') + 1;
+            assert.ok(snapshot.highlightStart >= prefixEnd, 'highlightStart should be after prefix');
+            const highlighted = snapshot.bufferText.substring(snapshot.highlightStart, snapshot.highlightEnd);
+            assert.ok(highlighted.includes('l'), 'highlighted text should include the character');
+        });
     });
 
     suite('checkOverflow', () => {
