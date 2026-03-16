@@ -48,9 +48,10 @@ The server is published as an npm package (`scc-language-server`) with a `bin` e
 
 ---
 
-## Current State (as of 2026-03-15)
+## Current State (as of 2026-03-16)
 
 ### Complete
+- **Phase 0: Local Setup** — Extension runs in VS Code Extension Development Host with syntax highlighting and hover tooltips working
 - **sccDecoder.ts** — Full EIA-608 hex code parsing: TEXT, PAC, MIDROW, CONTROL, INDENT, NULL, ERROR classification. Parity validation. Pair detection. 1000+ test cases.
 - **sccTimecode.ts** — Frame rate detection (23.98, 25, 29.97 DF/NDF), timecode parsing, arithmetic with cadence/drop-frame, comparison, packet difference via binary search. 200+ test cases.
 - **sccBufferFormat.ts** — Single-pass annotation rendering with italic state tracking.
@@ -60,8 +61,10 @@ The server is published as an npm package (`scc-language-server`) with a `bin` e
 - **VS Code client** — Extension launches server via IPC, registers SCC language.
 - **Shared data files** — All 6 JSON data files (char_map, colors, control_commands, frame_rates, parity_table, row_map) shared with the original project.
 
+### In Progress
+- **Phase 1: sccAnalyzer.ts** — The buffer state machine (the core intelligence). Must port `build_time_map()` and `build_buffer_snapshot()` from the original Python.
+
 ### Not Started
-- **sccAnalyzer.ts** — The buffer state machine (the core intelligence). Must port `build_time_map()` and `build_buffer_snapshot()` from the original Python.
 - **Diagnostics** — `textDocument/publishDiagnostics` for error detection.
 - **Code Lenses** — `textDocument/codeLens` for timing metadata.
 - **Line Annotations** — Custom `scc/lineAnnotations` request + VS Code decoration adapter.

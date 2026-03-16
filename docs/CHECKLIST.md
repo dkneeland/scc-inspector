@@ -7,15 +7,15 @@ Quick-reference checklist for tracking progress. Each item references the detail
 ## Phase 0: Local Setup & First Visual Test
 > Details: docs/EXECUTION_GUIDE.md → Phase 0
 
-- [ ] Node.js v18+ and npm installed (Step 0.1)
-- [ ] `npm install` succeeds (Step 0.2)
-- [ ] `npm run compile` produces `client/out/extension.js` and `server/out/server.js` (Step 0.3)
-- [ ] `.vscode/launch.json` created (Step 0.4)
-- [ ] `.vscode/tasks.json` created (Step 0.4)
-- [ ] F5 opens Extension Development Host (Step 0.5)
-- [ ] Syntax highlighting visible on `samples/big-buck-bunny.scc` (Step 0.6)
-- [ ] Hover tooltips work on hex codes (Step 0.6)
-- [ ] `cd server && npm test` — all tests pass (Step 0.8)
+- [x] Node.js v18+ and npm installed (Step 0.1)
+- [x] `npm install` succeeds (Step 0.2)
+- [x] `npm run compile` produces `client/out/extension.js` and `server/out/server.js` (Step 0.3)
+- [x] `.vscode/launch.json` created (Step 0.4)
+- [x] `.vscode/tasks.json` created (Step 0.4)
+- [x] F5 opens Extension Development Host (Step 0.5)
+- [x] Syntax highlighting visible on `samples/big-buck-bunny.scc` (Step 0.6)
+- [x] Hover tooltips work on hex codes (Step 0.6)
+- [x] `cd server && npm test` — all tests pass (Step 0.8)
 
 ---
 
