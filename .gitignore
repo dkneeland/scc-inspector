@@ -9,3 +9,4 @@ server/test/*.js
 server/test/*.js.map
 .claude/
 nul
+docs/HANDOFF.md
