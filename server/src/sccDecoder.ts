@@ -306,7 +306,7 @@ export function decodeSingleCode(wordText: string, isPair: boolean = false): str
 
 // Helper functions for buffer state
 export function getCommandByte(wordText: string): number {
-    return parseInt(wordText, 16) & 0xFF;
+    return parseInt(wordText, 16) & 0x7F;
 }
 
 export function isEoc(wordText: string): boolean {

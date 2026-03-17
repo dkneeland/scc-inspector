@@ -7,3 +7,4 @@ samples/AH*.scc
 *.tsbuildinfo
 server/test/*.js
 server/test/*.js.map
+nul

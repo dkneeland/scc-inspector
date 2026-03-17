@@ -14,8 +14,10 @@ import {
 } from 'vscode-languageserver/node';
 
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { parseSccCode, iterHexWords, TIMESTAMP_PATTERN, isEoc, isEdm, isEnm } from './sccDecoder';
+import { parseSccCode, iterHexWords, TIMESTAMP_PATTERN, isEoc, isEdm, isEnm, isRcl, HexWord } from './sccDecoder';
+import { addFrames, parseTimestampStr } from './sccTimecode';
 import { SccDocument } from './sccAnalyzer';
+import { formatTooltip } from './sccTooltip';
 
 const connection = createConnection(ProposedFeatures.all);
 const documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
@@ -138,26 +140,27 @@ connection.onHover(
             return undefined;
         }
 
-        const hexWords = [...iterHexWords(line)];
-        let targetWord = null;
+const hexWords = [...iterHexWords(line)];
+        let targetWord: HexWord | null = null;
         let logicalIdx = 0;
-        let currentLogicalIdx = 0;
-        const seenPaired = new Set<string>();
+        let packetIdx = 0;
 
         for (const word of hexWords) {
-            if (word.isPaired && seenPaired.has(word.text)) {
-                continue;
-            }
-            if (word.isPaired) {
-                seenPaired.add(word.text);
-            }
-
-            if (position.character >= word.start && position.character <= word.end) {
+            const isSecondOfPair = word.isPaired && word.start > word.pairStart;
+            
+            // Use pair range for matching (same as Python: pair_start <= col < pair_end)
+            if (position.character >= word.pairStart && position.character < word.pairEnd) {
                 targetWord = word;
-                logicalIdx = currentLogicalIdx;
                 break;
             }
-            currentLogicalIdx++;
+            
+            // Increment packet count for every word
+            packetIdx++;
+            
+            // Only increment logical index for first of pair or non-paired
+            if (!isSecondOfPair) {
+                logicalIdx++;
+            }
         }
 
         if (!targetWord) {
@@ -165,44 +168,79 @@ connection.onHover(
         }
 
         const decoded = parseSccCode(targetWord.text, targetWord.isPaired);
-        let hoverContent = `**${targetWord.text.toUpperCase()}**\n\n`;
-
-        if (decoded.type === 'TEXT') {
-            hoverContent += `Text: \`${decoded.text}\``;
-        } else if (decoded.type === 'CONTROL') {
-            hoverContent += `Control: \`${decoded.name}\``;
-        } else if (decoded.type === 'PAC') {
-            hoverContent += `PAC: Row ${decoded.row}, Col ${decoded.col}, ${decoded.color}`;
-        } else if (decoded.type === 'MIDROW') {
-            hoverContent += `Midrow: ${decoded.color}${decoded.underline ? ', Underline' : ''}`;
-        } else if (decoded.type === 'INDENT') {
-            hoverContent += `Tab Offset: ${decoded.spaces} spaces`;
-        } else if (decoded.type === 'NULL') {
-            hoverContent += `Null / Padding`;
-        } else if (decoded.type === 'ERROR') {
-            hoverContent += `**Error**: ${decoded.desc}`;
-        } else {
-            hoverContent += `Unknown code`;
+        const lbl = decoded.label ? ` (${decoded.label})` : '';
+        
+        let eventDesc: string;
+        switch (decoded.type) {
+            case 'TEXT':
+                eventDesc = `TEXT: "${decoded.text}" (${targetWord.text.toUpperCase()})${lbl}`;
+                break;
+            case 'PAC':
+                const ul = decoded.underline ? ' Und' : '';
+                eventDesc = `PAC : Row ${decoded.row}, Col ${decoded.col}, ${decoded.color}${ul} (${targetWord.text.toUpperCase()})${lbl}`;
+                break;
+            case 'MIDROW':
+                const ul2 = decoded.underline ? ' Und' : '';
+                eventDesc = `CMD : Mid-Row: ${decoded.color?.slice(0, 3)}${ul2}${lbl}`;
+                break;
+            case 'CONTROL':
+                eventDesc = `CMD : ${decoded.name?.split('(')[0].trim()} (${targetWord.text.toUpperCase()})${lbl}`;
+                break;
+            case 'INDENT':
+                const n = decoded.spaces;
+                eventDesc = `CMD : Indent ${n} ${n === 1 ? 'space' : 'spaces'} (${targetWord.text.toUpperCase()})${lbl}`;
+                break;
+            case 'NULL':
+                eventDesc = `NULL: Null / Padding (${targetWord.text.toUpperCase()})${lbl}`;
+                break;
+            case 'ERROR':
+                eventDesc = `ERROR: ${decoded.desc} (${targetWord.text.toUpperCase()})${lbl}`;
+                break;
+            default:
+                eventDesc = `UNKNOWN: ${targetWord.text.toUpperCase()}`;
         }
 
         const sccDoc = getOrCreateSccDocument(document.uri);
-        sccDoc.analyze(document.getText());
+        const analysis = sccDoc.analyze(document.getText());
+        
+        const tsMatch = line.match(TIMESTAMP_PATTERN);
+        const baseTime = tsMatch ? tsMatch[0] : '';
+        
+        // Calculate actual timecode based on packet position and frame rate
+        let timestampDesc: string;
+        if (analysis.frameRate && tsMatch) {
+            try {
+                const ts = parseTimestampStr(baseTime);
+                const [pktTime] = addFrames(ts.hours, ts.minutes, ts.seconds, ts.frames, packetIdx, analysis.frameRate);
+                const pktWord = packetIdx === 1 ? 'packet' : 'packets';
+                timestampDesc = `TIME: ${pktTime} (+${packetIdx} ${pktWord})`;
+            } catch {
+                timestampDesc = `TIME: ${baseTime} (+${packetIdx})`;
+            }
+        } else {
+            timestampDesc = `TIME: ${baseTime} (+${packetIdx})`;
+        }
 
         const snapshot = sccDoc.getBufferSnapshot(position.line, logicalIdx);
-        if (snapshot.bufferText) {
-            if (snapshot.highlightStart >= 0 && snapshot.highlightEnd > snapshot.highlightStart) {
-                const caretLine = ' '.repeat(snapshot.highlightStart)
-                    + '^'.repeat(snapshot.highlightEnd - snapshot.highlightStart);
-                hoverContent += '\n\n---\n\n**BUF:**\n```\n' + snapshot.bufferText + '\n' + caretLine + '\n```';
-            } else {
-                hoverContent += '\n\n---\n\n**BUF:**\n```\n' + snapshot.bufferText + '\n```';
-            }
-        }
+        
+        const isControl = decoded.type === 'CONTROL' || decoded.type === 'NULL';
+        const overflow = sccDoc.checkOverflow(position.line);
+        const overflowInfo: [boolean, number] | undefined = overflow.isOverflow ? [true, overflow.overflowCount] : undefined;
+
+        const tooltipText = formatTooltip(
+            eventDesc,
+            timestampDesc,
+            snapshot.bufferText,
+            snapshot.highlightStart,
+            snapshot.highlightEnd,
+            isControl,
+            overflowInfo
+        );
 
         return {
             contents: {
                 kind: MarkupKind.Markdown,
-                value: hoverContent
+                value: '```\n' + tooltipText + '\n```'
             },
             range: {
                 start: { line: position.line, character: targetWord.start },

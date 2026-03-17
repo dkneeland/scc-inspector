@@ -235,31 +235,31 @@ export class SccDocument {
 
         for (const histLine of historicalLines) {
             const hexWords = [...iterHexWords(histLine.text)];
-            const seenPaired = new Set<string>();
 
             for (const word of hexWords) {
-                if (word.isPaired && seenPaired.has(word.text)) {
-                    continue;
-                }
-                if (word.isPaired) {
-                    seenPaired.add(word.text);
-                }
+                const isSecondOfPair = word.isPaired && word.start > word.pairStart;
+                if (isSecondOfPair) continue;
 
                 const evt = parseSccCode(word.text, word.isPaired);
 
                 switch (evt.type) {
                     case 'PAC':
-                        initialState = {
-                            row: evt.row ?? 0,
-                            col: evt.col ?? 0,
-                            color: evt.color ?? 'White'
-                        };
+                        if (initialState === null) {
+                            initialState = {
+                                row: evt.row ?? 0,
+                                col: evt.col ?? 0,
+                                color: evt.color ?? 'White'
+                            };
+                        } else {
+                            bufText += `{R${String(evt.row ?? 0).padStart(2, '0')} C${String(evt.col ?? 0).padStart(2, '0')} ${evt.color ?? 'White'}}`;
+                        }
                         isItalic = evt.isItalic ?? false;
                         break;
                     case 'TEXT':
                         bufText += evt.text ?? '';
                         break;
                     case 'MIDROW':
+                        bufText += '<i>';
                         isItalic = evt.isItalic ?? false;
                         break;
                     case 'INDENT':
@@ -285,21 +285,21 @@ export class SccDocument {
 
         const hexWords = [...iterHexWords(currentLineText)];
         let logicalIdx = 0;
+        let wordLogicalIdx = 0;
         let highlightStart = -1;
         let highlightEnd = -1;
-        const seenPaired = new Set<string>();
 
         for (const word of hexWords) {
-            if (word.isPaired && seenPaired.has(word.text)) {
-                continue;
-            }
-            if (word.isPaired) {
-                seenPaired.add(word.text);
+            const isSecondOfPair = word.isPaired && word.start > word.pairStart;
+
+            // Assign logical index for this word (second of pair shares same index as first)
+            if (!isSecondOfPair) {
+                wordLogicalIdx = logicalIdx;
             }
 
             const evt = parseSccCode(word.text, word.isPaired);
 
-            if (logicalIdx === targetWordIdx) {
+            if (wordLogicalIdx === targetWordIdx) {
                 switch (evt.type) {
                     case 'TEXT':
                         highlightStart = bufText.length;
@@ -330,13 +330,11 @@ export class SccDocument {
                             highlightStart = Math.max(0, bufText.length - 1);
                             bufText = bufText.slice(0, -1);
                             highlightEnd = bufText.length;
-                        } else if (isEnm(word.text) || isEdm(word.text)) {
+                        } else if (isEnm(word.text) || isRcl(word.text)) {
                             highlightStart = 0;
                             bufText = '';
                             highlightEnd = 0;
-                        } else {
-                            highlightStart = bufText.length;
-                            highlightEnd = bufText.length;
+                            initialState = null;
                         }
                         break;
                     case 'NULL':
@@ -350,36 +348,47 @@ export class SccDocument {
                 break;
             }
 
-            switch (evt.type) {
-                case 'PAC':
-                    initialState = {
-                        row: evt.row ?? 0,
-                        col: evt.col ?? 0,
-                        color: evt.color ?? 'White'
-                    };
-                    isItalic = evt.isItalic ?? false;
-                    break;
-                case 'TEXT':
-                    bufText += evt.text ?? '';
-                    break;
-                case 'MIDROW':
-                    isItalic = evt.isItalic ?? false;
-                    break;
-                case 'INDENT':
-                    bufText += ' '.repeat(evt.spaces ?? 0);
-                    break;
-                case 'CONTROL':
-                    if (evt.isBackspace && bufText.length > 0) {
-                        bufText = bufText.slice(0, -1);
-                    }
-                    if (isEnm(word.text) || isRcl(word.text)) {
-                        bufText = '';
-                        initialState = null;
-                    }
-                    break;
+            // Process for buffer state (only for first of pair or non-paired words)
+            if (!isSecondOfPair) {
+                switch (evt.type) {
+                    case 'PAC':
+                        if (initialState === null) {
+                            initialState = {
+                                row: evt.row ?? 0,
+                                col: evt.col ?? 0,
+                                color: evt.color ?? 'White'
+                            };
+                        } else {
+                            bufText += `{R${String(evt.row ?? 0).padStart(2, '0')} C${String(evt.col ?? 0).padStart(2, '0')} ${evt.color ?? 'White'}}`;
+                        }
+                        isItalic = evt.isItalic ?? false;
+                        break;
+                    case 'TEXT':
+                        bufText += evt.text ?? '';
+                        break;
+                    case 'MIDROW':
+                        bufText += '<i>';
+                        isItalic = evt.isItalic ?? false;
+                        break;
+                    case 'INDENT':
+                        bufText += ' '.repeat(evt.spaces ?? 0);
+                        break;
+                    case 'CONTROL':
+                        if (evt.isBackspace && bufText.length > 0) {
+                            bufText = bufText.slice(0, -1);
+                        }
+                        if (isEnm(word.text) || isRcl(word.text)) {
+                            bufText = '';
+                            initialState = null;
+                        }
+                        break;
+                }
             }
 
-            logicalIdx++;
+            // Only increment logical index for first of pair or non-paired words
+            if (!isSecondOfPair) {
+                logicalIdx++;
+            }
         }
 
         const formatted = this._formatBuffer(bufText, initialState);
