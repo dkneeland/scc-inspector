@@ -140,7 +140,7 @@ connection.onHover(
             return undefined;
         }
 
-const hexWords = [...iterHexWords(line)];
+        const hexWords = [...iterHexWords(line)];
         let targetWord: HexWord | null = null;
         let logicalIdx = 0;
         let packetIdx = 0;

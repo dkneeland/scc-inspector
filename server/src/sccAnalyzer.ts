@@ -30,18 +30,31 @@ export interface OverflowResult {
     overflowCount: number;
 }
 
+export interface DiagnosticInfo {
+    lineNum: number;
+    startChar: number;
+    endChar: number;
+    code: string;
+    message: string;
+    severity: 'error' | 'warning' | 'info';
+}
+
 export interface AnalysisResult {
     frameRate: string | null;
     timestampMap: Map<number, TimestampInfo>;
     timeMap: Map<number, TimeRange>;
     lineTexts: Map<number, string>;
     neverDisplayedLines: number[];
+    neverErasedLines: number[];
+    nonMonotonicLines: number[];
+    sortedLineNums: number[];
 }
 
 export class SccDocument {
     private contentHash: string = '';
     private analysis: AnalysisResult | null = null;
     private rawText: string = '';
+    private lines: string[] = [];
 
     analyze(text: string): AnalysisResult {
         const newHash = createHash('md5').update(text).digest('hex');
@@ -50,6 +63,7 @@ export class SccDocument {
         }
         
         this.rawText = text;
+        this.lines = text.split(/\r?\n/);
         this.contentHash = newHash;
         this.analysis = this._performAnalysis(text);
         return this.analysis;
@@ -60,11 +74,13 @@ export class SccDocument {
         const timeMap = new Map<number, TimeRange>();
         const lineTexts = new Map<number, string>();
         const neverDisplayedLines: number[] = [];
+        const neverErasedLines: number[] = [];
+        const nonMonotonicLines: number[] = [];
 
         const [frameRate] = detectFrameRate(text);
         const validFrameRate = frameRate !== 'INVALID' ? frameRate : null;
 
-        const lines = text.split(/\r?\n/);
+        const lines = this.lines;
         const pendingLines: number[] = [];
         const activeLines: number[] = [];
 
@@ -88,19 +104,13 @@ export class SccDocument {
             let hasAddedPending = false;
             let wordIdx = 0;
 
-            const seenPaired = new Set<string>();
-
             for (const word of hexWords) {
-                const wordKey = `${word.text}:${word.start}`;
+                const isSecondOfPair = word.isPaired && word.start > word.pairStart;
                 
-                if (word.isPaired && seenPaired.has(word.text)) {
+                if (isSecondOfPair) {
                     packetCount++;
                     wordIdx++;
                     continue;
-                }
-                
-                if (word.isPaired) {
-                    seenPaired.add(word.text);
                 }
 
                 const evt = parseSccCode(word.text, word.isPaired);
@@ -182,6 +192,23 @@ export class SccDocument {
             if (tr.startTime === null) {
                 neverDisplayedLines.push(lineNum);
             }
+            if (tr.startTime !== null && tr.endTime === null) {
+                neverErasedLines.push(lineNum);
+            }
+        }
+
+        const sortedLineNums = [...timestampMap.keys()].sort((a, b) => a - b);
+        const sortedKeys = sortedLineNums;
+        for (let i = 1; i < sortedKeys.length; i++) {
+            const prevEntry = timestampMap.get(sortedKeys[i - 1])!;
+            const currEntry = timestampMap.get(sortedKeys[i])!;
+            try {
+                if (compareTimestamps(currEntry.timestampStr, prevEntry.timestampStr) < 0) {
+                    nonMonotonicLines.push(sortedKeys[i]);
+                }
+            } catch {
+                // Skip comparison if timestamp parsing fails
+            }
         }
 
         return {
@@ -189,7 +216,10 @@ export class SccDocument {
             timestampMap,
             timeMap,
             lineTexts,
-            neverDisplayedLines
+            neverDisplayedLines,
+            neverErasedLines,
+            nonMonotonicLines,
+            sortedLineNums
         };
     }
 
@@ -198,7 +228,7 @@ export class SccDocument {
             return { bufferText: '', highlightStart: -1, highlightEnd: -1 };
         }
 
-        const lines = this.rawText.split(/\r?\n/);
+        const lines = this.lines;
         const historicalLines: { lineNum: number; text: string }[] = [];
 
         for (let i = lineNum - 1; i >= 0; i--) {
@@ -413,14 +443,14 @@ export class SccDocument {
             return { isOverflow: false, overflowCount: 0 };
         }
 
-        const { timestampMap, frameRate } = this.analysis;
+        const { timestampMap, frameRate, sortedLineNums } = this.analysis;
         
         const currentEntry = timestampMap.get(lineNum);
         if (!currentEntry) {
             return { isOverflow: false, overflowCount: 0 };
         }
 
-        const sortedKeys = [...timestampMap.keys()].sort((a, b) => a - b);
+        const sortedKeys = sortedLineNums;
         const currentIdx = sortedKeys.indexOf(lineNum);
         
         if (currentIdx === -1 || currentIdx >= sortedKeys.length - 1) {
@@ -444,8 +474,7 @@ export class SccDocument {
 
             if (compareTimestamps(lastPacketTime, nextEntry.timestampStr) >= 0) {
                 const totalPackets = currentEntry.packetCount;
-                const lines = this.rawText.split(/\r?\n/);
-                const lineText = lines[lineNum];
+                const lineText = this.lines[lineNum];
                 if (!lineText) {
                     return { isOverflow: true, overflowCount: totalPackets };
                 }
@@ -481,6 +510,49 @@ export class SccDocument {
 
     getContentHash(): string {
         return this.contentHash;
+    }
+
+    collectDiagnostics(): DiagnosticInfo[] {
+        if (!this.analysis) return [];
+        const diagnostics: DiagnosticInfo[] = [];
+
+        // SCC004: Never-displayed captions (from neverDisplayedLines)
+        for (const lineNum of this.analysis.neverDisplayedLines) {
+            diagnostics.push({
+                lineNum,
+                startChar: 0,
+                endChar: 0,
+                code: 'SCC004',
+                message: 'Caption never displayed - has text but no EOC (End of Caption)',
+                severity: 'warning'
+            });
+        }
+
+        // SCC005: Never-erased captions (from neverErasedLines)
+        for (const lineNum of this.analysis.neverErasedLines) {
+            diagnostics.push({
+                lineNum,
+                startChar: 0,
+                endChar: 0,
+                code: 'SCC005',
+                message: 'Caption never erased - has EOC but no EDM (Erase Displayed Memory)',
+                severity: 'warning'
+            });
+        }
+
+        // SCC006: Non-monotonic timestamps (from nonMonotonicLines)
+        for (const lineNum of this.analysis.nonMonotonicLines) {
+            diagnostics.push({
+                lineNum,
+                startChar: 0,
+                endChar: 0,
+                code: 'SCC006',
+                message: 'Non-monotonic timestamp - timestamp goes backwards from previous line',
+                severity: 'error'
+            });
+        }
+
+        return diagnostics;
     }
 }
 

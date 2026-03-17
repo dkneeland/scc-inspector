@@ -45,5 +45,29 @@
       "lineNum": 2,
       "expectedOverflow": false
     }
+  ],
+  "neverErased": [
+    {
+      "name": "caption with EOC but no EDM",
+      "input": "Scenarist_SCC V1.0\n\n00:00:01:00\t9420 9420 c865 ecec ef\n\n00:00:02:00\t942f 942f",
+      "expectedNeverErasedLines": [2]
+    },
+    {
+      "name": "caption with both EOC and EDM",
+      "input": "Scenarist_SCC V1.0\n\n00:00:01:00\t9420 9420 c865 ecec ef\n\n00:00:02:00\t942f 942f\n\n00:00:05:00\t942c 942c",
+      "expectedNeverErasedLines": []
+    }
+  ],
+  "nonMonotonic": [
+    {
+      "name": "timestamp goes backwards",
+      "input": "Scenarist_SCC V1.0\n\n00:00:05:00\t9420 9420\n\n00:00:01:00\t942f 942f",
+      "expectedNonMonotonicLines": [4]
+    },
+    {
+      "name": "normal ascending timestamps",
+      "input": "Scenarist_SCC V1.0\n\n00:00:01:00\t9420 9420\n\n00:00:02:00\t942f 942f",
+      "expectedNonMonotonicLines": []
+    }
   ]
 }

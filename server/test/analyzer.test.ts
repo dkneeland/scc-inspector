@@ -193,6 +193,127 @@ Some line without timestamp
         });
     });
 
+    suite('analyze - never erased', () => {
+        test('caption with EOC but no EDM flagged as never erased', () => {
+            const doc = new SccDocument();
+            const input = `Scenarist_SCC V1.0
+
+00:00:01:00\t9420 9420 c865 ecec ef
+
+00:00:02:00\t942f 942f`;
+            
+            const result = doc.analyze(input);
+            
+            assert.ok(result.neverErasedLines.includes(2), 'Line with EOC but no EDM should be in neverErasedLines');
+        });
+
+        test('caption with both EOC and EDM not in neverErasedLines', () => {
+            const doc = new SccDocument();
+            const input = `Scenarist_SCC V1.0
+
+00:00:01:00\t9420 9420 c865 ecec ef
+
+00:00:02:00\t942f 942f
+
+00:00:05:00\t942c 942c`;
+            
+            const result = doc.analyze(input);
+            
+            assert.strictEqual(result.neverErasedLines.length, 0, 'Caption with both EOC and EDM should not be in neverErasedLines');
+        });
+    });
+
+    suite('analyze - non-monotonic timestamps', () => {
+        test('timestamp going backwards flagged as non-monotonic', () => {
+            const doc = new SccDocument();
+            const input = `Scenarist_SCC V1.0
+
+00:00:05:00\t9420 9420
+
+00:00:01:00\t942f 942f`;
+            
+            const result = doc.analyze(input);
+            
+            assert.ok(result.nonMonotonicLines.includes(4), 'Line with decreasing timestamp should be in nonMonotonicLines');
+        });
+
+        test('normal ascending timestamps not flagged', () => {
+            const doc = new SccDocument();
+            const input = `Scenarist_SCC V1.0
+
+00:00:01:00\t9420 9420
+
+00:00:02:00\t942f 942f`;
+            
+            const result = doc.analyze(input);
+            
+            assert.strictEqual(result.nonMonotonicLines.length, 0, 'Ascending timestamps should not be flagged');
+        });
+    });
+
+    suite('analyze - repeated paired codes', () => {
+        test('repeated paired code on same line counted correctly', () => {
+            const doc = new SccDocument();
+            const input = `Scenarist_SCC V1.0
+
+00:00:01:00\t9420 9420 94ad 94ad 942f 942f`;
+            
+            const result = doc.analyze(input);
+            
+            assert.ok(result.timestampMap.has(2));
+            const ti = result.timestampMap.get(2);
+            assert.strictEqual(ti!.packetCount, 6, '6 hex words total should be counted');
+        });
+    });
+
+    suite('collectDiagnostics', () => {
+        test('never displayed captions produce SCC004 diagnostics', () => {
+            const doc = new SccDocument();
+            const input = `Scenarist_SCC V1.0
+
+00:00:01:00\t9420 9420 c865 ecec ef`;
+            
+            doc.analyze(input);
+            const diagnostics = doc.collectDiagnostics();
+            
+            const scc004 = diagnostics.find(d => d.code === 'SCC004');
+            assert.ok(scc004, 'Should have SCC004 diagnostic');
+            assert.strictEqual(scc004!.lineNum, 2);
+        });
+
+        test('never erased captions produce SCC005 diagnostics', () => {
+            const doc = new SccDocument();
+            const input = `Scenarist_SCC V1.0
+
+00:00:01:00\t9420 9420 c865 ecec ef
+
+00:00:02:00\t942f 942f`;
+            
+            doc.analyze(input);
+            const diagnostics = doc.collectDiagnostics();
+            
+            const scc005 = diagnostics.find(d => d.code === 'SCC005');
+            assert.ok(scc005, 'Should have SCC005 diagnostic');
+            assert.strictEqual(scc005!.lineNum, 2);
+        });
+
+        test('non-monotonic timestamps produce SCC006 diagnostics', () => {
+            const doc = new SccDocument();
+            const input = `Scenarist_SCC V1.0
+
+00:00:05:00\t9420 9420
+
+00:00:01:00\t942f 942f`;
+            
+            doc.analyze(input);
+            const diagnostics = doc.collectDiagnostics();
+            
+            const scc006 = diagnostics.find(d => d.code === 'SCC006');
+            assert.ok(scc006, 'Should have SCC006 diagnostic');
+            assert.strictEqual(scc006!.lineNum, 4);
+        });
+    });
+
     suite('getBufferSnapshot - control commands', () => {
         test('EDM should NOT clear buffer when hovered (EDM only clears displayed memory)', () => {
             const doc = new SccDocument();
