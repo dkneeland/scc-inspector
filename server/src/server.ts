@@ -4,8 +4,6 @@ import {
     ProposedFeatures,
     InitializeParams,
     DidChangeConfigurationNotification,
-    CompletionItem,
-    CompletionItemKind,
     TextDocumentPositionParams,
     TextDocumentSyncKind,
     InitializeResult,
@@ -14,7 +12,7 @@ import {
 } from 'vscode-languageserver/node';
 
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { parseSccCode, iterHexWords, TIMESTAMP_PATTERN, isEoc, isEdm, isEnm, isRcl, HexWord } from './sccDecoder';
+import { parseSccCode, iterHexWords, TIMESTAMP_PATTERN, HexWord } from './sccDecoder';
 import { addFrames, parseTimestampStr } from './sccTimecode';
 import { SccDocument } from './sccAnalyzer';
 import { formatTooltip } from './sccTooltip';
@@ -25,16 +23,12 @@ const documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
 const sccDocuments: Map<string, SccDocument> = new Map();
 
 let hasConfigurationCapability = false;
-let hasWorkspaceFolderCapability = false;
 
 connection.onInitialize((params: InitializeParams) => {
     const capabilities = params.capabilities;
 
     hasConfigurationCapability = !!(
         capabilities.workspace && !!capabilities.workspace.configuration
-    );
-    hasWorkspaceFolderCapability = !!(
-        capabilities.workspace && !!capabilities.workspace.workspaceFolders
     );
 
     const result: InitializeResult = {
@@ -74,7 +68,7 @@ const defaultSettings: SCCSettings = {
 let globalSettings: SCCSettings = defaultSettings;
 const documentSettings: Map<string, Thenable<SCCSettings>> = new Map();
 
-function getDocumentSettings(resource: string): Thenable<SCCSettings> {
+function _getDocumentSettings(resource: string): Thenable<SCCSettings> {
     if (!hasConfigurationCapability) {
         return Promise.resolve(globalSettings);
     }
@@ -154,10 +148,8 @@ connection.onHover(
                 break;
             }
             
-            // Increment packet count for every word
             packetIdx++;
-            
-            // Only increment logical index for first of pair or non-paired
+
             if (!isSecondOfPair) {
                 logicalIdx++;
             }
@@ -175,21 +167,24 @@ connection.onHover(
             case 'TEXT':
                 eventDesc = `TEXT: "${decoded.text}" (${targetWord.text.toUpperCase()})${lbl}`;
                 break;
-            case 'PAC':
+            case 'PAC': {
                 const ul = decoded.underline ? ' Und' : '';
                 eventDesc = `PAC : Row ${decoded.row}, Col ${decoded.col}, ${decoded.color}${ul} (${targetWord.text.toUpperCase()})${lbl}`;
                 break;
-            case 'MIDROW':
+            }
+            case 'MIDROW': {
                 const ul2 = decoded.underline ? ' Und' : '';
                 eventDesc = `CMD : Mid-Row: ${decoded.color?.slice(0, 3)}${ul2}${lbl}`;
                 break;
+            }
             case 'CONTROL':
                 eventDesc = `CMD : ${decoded.name?.split('(')[0].trim()} (${targetWord.text.toUpperCase()})${lbl}`;
                 break;
-            case 'INDENT':
+            case 'INDENT': {
                 const n = decoded.spaces;
                 eventDesc = `CMD : Indent ${n} ${n === 1 ? 'space' : 'spaces'} (${targetWord.text.toUpperCase()})${lbl}`;
                 break;
+            }
             case 'NULL':
                 eventDesc = `NULL: Null / Padding (${targetWord.text.toUpperCase()})${lbl}`;
                 break;
@@ -206,7 +201,6 @@ connection.onHover(
         const tsMatch = line.match(TIMESTAMP_PATTERN);
         const baseTime = tsMatch ? tsMatch[0] : '';
         
-        // Calculate actual timecode based on packet position and frame rate
         let timestampDesc: string;
         if (analysis.frameRate && tsMatch) {
             try {

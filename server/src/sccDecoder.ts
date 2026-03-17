@@ -7,12 +7,14 @@
 
 import * as path from 'path';
 
-// Load shared data
+// Load shared data – runtime JSON requires are intentional (data files outside TS compilation)
+/* eslint-disable @typescript-eslint/no-require-imports */
 const charMapData = require(path.join(__dirname, '../data/char_map.json'));
 const controlCommandsData = require(path.join(__dirname, '../data/control_commands.json'));
 const parityTableData = require(path.join(__dirname, '../data/parity_table.json'));
 const colorsData = require(path.join(__dirname, '../data/colors.json'));
 const rowMapData = require(path.join(__dirname, '../data/row_map.json'));
+/* eslint-enable @typescript-eslint/no-require-imports */
 
 // Constants from JSON data
 const CHAR_MAP: string = charMapData.charString;
@@ -104,7 +106,6 @@ export function* iterHexWords(lineText: string): Generator<HexWord> {
                 const nextStart = nextMatch.index!;
                 const nextEnd = nextStart + nextMatch[0].length;
                 
-                // First of pair
                 yield {
                     text: currText,
                     start: currStart,
@@ -114,7 +115,6 @@ export function* iterHexWords(lineText: string): Generator<HexWord> {
                     pairEnd: Math.max(currEnd, nextEnd)
                 };
                 
-                // Second of pair
                 yield {
                     text: currText,
                     start: nextStart,
@@ -141,7 +141,7 @@ export function* iterHexWords(lineText: string): Generator<HexWord> {
     }
 }
 
-export function parseSccCode(wordText: string, isPair: boolean = false): DecodeEvent {
+export function parseSccCode(wordText: string, _isPair: boolean = false): DecodeEvent {
     const word = wordText.toLowerCase();
     
     if (word === '8080' || word === '0000') {
@@ -282,17 +282,20 @@ export function decodeSingleCode(wordText: string, isPair: boolean = false): str
     const lbl = evt.label || '';
     
     switch (evt.type) {
-        case 'PAC':
+        case 'PAC': {
             const ul = evt.underline ? ' Underlined' : '';
             return `${prefix}${lbl}Row ${String(evt.row).padStart(2, '0')}, Col ${String(evt.col).padStart(2, '0')}, ${evt.color}${ul}`;
-        case 'MIDROW':
+        }
+        case 'MIDROW': {
             const ul2 = evt.underline ? ' Underlined' : '';
             return `${prefix}${lbl}Mid-row: ${evt.color}${ul2}`;
+        }
         case 'CONTROL':
             return evt.desc || `${prefix}${lbl}${evt.name}`;
-        case 'INDENT':
+        case 'INDENT': {
             const n = evt.spaces!;
             return `${prefix}${lbl}Indent ${n} ${n === 1 ? 'space' : 'spaces'}`;
+        }
         case 'TEXT':
             return `${prefix}${lbl}Text: "${evt.text}"`;
         case 'NULL':
@@ -326,10 +329,7 @@ export function isEdm(wordText: string): boolean {
 }
 
 export function checkParityFast(hexStr: string): boolean {
-    try {
-        const val = parseInt(hexStr, 16);
-        return hasOddParity((val >> 8) & 0xFF) && hasOddParity(val & 0xFF);
-    } catch {
-        return false;
-    }
+    const val = parseInt(hexStr, 16);
+    if (isNaN(val)) return false;
+    return hasOddParity((val >> 8) & 0xFF) && hasOddParity(val & 0xFF);
 }

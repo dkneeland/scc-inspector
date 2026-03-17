@@ -5,8 +5,8 @@
  * Builds timing maps and buffer snapshots for diagnostic and tooltip features.
  */
 
-import { iterHexWords, parseSccCode, TIMESTAMP_PATTERN, isEoc, isEdm, isEnm, isRcl, HexWord, DecodeEvent } from './sccDecoder';
-import { detectFrameRate, addFrames, parseTimestampStr, compareTimestamps, FrameRateConfig, getFrameRateConfig } from './sccTimecode';
+import { iterHexWords, parseSccCode, TIMESTAMP_PATTERN, isEoc, isEdm, isEnm, isRcl, DecodeEvent } from './sccDecoder';
+import { detectFrameRate, addFrames, parseTimestampStr, compareTimestamps } from './sccTimecode';
 import { createHash } from 'crypto';
 
 export interface TimestampInfo {
@@ -48,6 +48,60 @@ export interface AnalysisResult {
     neverErasedLines: number[];
     nonMonotonicLines: number[];
     sortedLineNums: number[];
+}
+
+interface BufferState {
+    bufText: string;
+    initialState: { row: number; col: number; color: string } | null;
+    isItalic: boolean;
+}
+
+function applyEventToBuffer(state: BufferState, evt: DecodeEvent, wordText: string): void {
+    switch (evt.type) {
+        case 'PAC':
+            if (state.initialState === null) {
+                state.initialState = {
+                    row: evt.row ?? 0,
+                    col: evt.col ?? 0,
+                    color: evt.color ?? 'White'
+                };
+            } else {
+                state.bufText += `{R${String(evt.row ?? 0).padStart(2, '0')} C${String(evt.col ?? 0).padStart(2, '0')} ${evt.color ?? 'White'}}`;
+            }
+            state.isItalic = evt.isItalic ?? false;
+            break;
+        case 'TEXT':
+            state.bufText += evt.text ?? '';
+            break;
+        case 'MIDROW':
+            state.bufText += '<i>';
+            state.isItalic = evt.isItalic ?? false;
+            break;
+        case 'INDENT':
+            state.bufText += ' '.repeat(evt.spaces ?? 0);
+            break;
+        case 'CONTROL':
+            if (evt.isBackspace && state.bufText.length > 0) {
+                state.bufText = state.bufText.slice(0, -1);
+            }
+            if (isEnm(wordText) || isRcl(wordText)) {
+                state.bufText = '';
+                state.initialState = null;
+            }
+            break;
+    }
+}
+
+function binarySearchIndex(sortedArr: number[], target: number): number {
+    let lo = 0;
+    let hi = sortedArr.length - 1;
+    while (lo <= hi) {
+        const mid = (lo + hi) >>> 1;
+        if (sortedArr[mid] === target) return mid;
+        if (sortedArr[mid] < target) lo = mid + 1;
+        else hi = mid - 1;
+    }
+    return -1;
 }
 
 export class SccDocument {
@@ -207,7 +261,7 @@ export class SccDocument {
                     nonMonotonicLines.push(sortedKeys[i]);
                 }
             } catch {
-                // Skip comparison if timestamp parsing fails
+                // timestamp parsing failed; skip comparison
             }
         }
 
@@ -245,7 +299,8 @@ export class SccDocument {
             const hexWords = [...iterHexWords(lineText)];
             let hasEnm = false;
             for (const word of hexWords) {
-                if (word.isPaired) continue;
+                const isSecondOfPair = word.isPaired && word.start > word.pairStart;
+                if (isSecondOfPair) continue;
                 if (isEnm(word.text)) {
                     hasEnm = true;
                     break;
@@ -259,9 +314,7 @@ export class SccDocument {
             }
         }
 
-        let bufText = '';
-        let initialState: { row: number; col: number; color: string } | null = null;
-        let isItalic = false;
+        const buf: BufferState = { bufText: '', initialState: null, isItalic: false };
 
         for (const histLine of historicalLines) {
             const hexWords = [...iterHexWords(histLine.text)];
@@ -271,46 +324,13 @@ export class SccDocument {
                 if (isSecondOfPair) continue;
 
                 const evt = parseSccCode(word.text, word.isPaired);
-
-                switch (evt.type) {
-                    case 'PAC':
-                        if (initialState === null) {
-                            initialState = {
-                                row: evt.row ?? 0,
-                                col: evt.col ?? 0,
-                                color: evt.color ?? 'White'
-                            };
-                        } else {
-                            bufText += `{R${String(evt.row ?? 0).padStart(2, '0')} C${String(evt.col ?? 0).padStart(2, '0')} ${evt.color ?? 'White'}}`;
-                        }
-                        isItalic = evt.isItalic ?? false;
-                        break;
-                    case 'TEXT':
-                        bufText += evt.text ?? '';
-                        break;
-                    case 'MIDROW':
-                        bufText += '<i>';
-                        isItalic = evt.isItalic ?? false;
-                        break;
-                    case 'INDENT':
-                        bufText += ' '.repeat(evt.spaces ?? 0);
-                        break;
-                    case 'CONTROL':
-                        if (evt.isBackspace && bufText.length > 0) {
-                            bufText = bufText.slice(0, -1);
-                        }
-                        if (isEnm(word.text) || isRcl(word.text)) {
-                            bufText = '';
-                            initialState = null;
-                        }
-                        break;
-                }
+                applyEventToBuffer(buf, evt, word.text);
             }
         }
 
         const currentLineText = lines[lineNum];
         if (!currentLineText) {
-            return { bufferText: this._formatBuffer(bufText, initialState), highlightStart: -1, highlightEnd: -1 };
+            return { bufferText: this._formatBuffer(buf.bufText, buf.initialState), highlightStart: -1, highlightEnd: -1 };
         }
 
         const hexWords = [...iterHexWords(currentLineText)];
@@ -322,7 +342,6 @@ export class SccDocument {
         for (const word of hexWords) {
             const isSecondOfPair = word.isPaired && word.start > word.pairStart;
 
-            // Assign logical index for this word (second of pair shares same index as first)
             if (!isSecondOfPair) {
                 wordLogicalIdx = logicalIdx;
             }
@@ -332,39 +351,42 @@ export class SccDocument {
             if (wordLogicalIdx === targetWordIdx) {
                 switch (evt.type) {
                     case 'TEXT':
-                        highlightStart = bufText.length;
-                        bufText += evt.text ?? '';
-                        highlightEnd = bufText.length;
+                        highlightStart = buf.bufText.length;
+                        buf.bufText += evt.text ?? '';
+                        highlightEnd = buf.bufText.length;
                         break;
-                    case 'PAC':
+                    case 'PAC': {
                         const pacStr = `{R${String(evt.row ?? 0).padStart(2, '0')} C${String(evt.col ?? 0).padStart(2, '0')} ${evt.color ?? 'White'}}`;
-                        highlightStart = bufText.length;
-                        bufText += pacStr;
-                        highlightEnd = bufText.length;
+                        highlightStart = buf.bufText.length;
+                        buf.bufText += pacStr;
+                        highlightEnd = buf.bufText.length;
                         break;
-                    case 'MIDROW':
-                        const midStr = isItalic ? '</i>' : '<i>';
-                        highlightStart = bufText.length;
-                        bufText += midStr;
-                        highlightEnd = bufText.length;
-                        isItalic = !isItalic;
+                    }
+                    case 'MIDROW': {
+                        const midStr = buf.isItalic ? '</i>' : '<i>';
+                        highlightStart = buf.bufText.length;
+                        buf.bufText += midStr;
+                        highlightEnd = buf.bufText.length;
+                        buf.isItalic = !buf.isItalic;
                         break;
-                    case 'INDENT':
+                    }
+                    case 'INDENT': {
                         const indentStr = ' '.repeat(evt.spaces ?? 0);
-                        highlightStart = bufText.length;
-                        bufText += indentStr;
-                        highlightEnd = bufText.length;
+                        highlightStart = buf.bufText.length;
+                        buf.bufText += indentStr;
+                        highlightEnd = buf.bufText.length;
                         break;
+                    }
                     case 'CONTROL':
                         if (evt.isBackspace) {
-                            highlightStart = Math.max(0, bufText.length - 1);
-                            bufText = bufText.slice(0, -1);
-                            highlightEnd = bufText.length;
+                            highlightStart = Math.max(0, buf.bufText.length - 1);
+                            buf.bufText = buf.bufText.slice(0, -1);
+                            highlightEnd = buf.bufText.length;
                         } else if (isEnm(word.text) || isRcl(word.text)) {
                             highlightStart = 0;
-                            bufText = '';
+                            buf.bufText = '';
                             highlightEnd = 0;
-                            initialState = null;
+                            buf.initialState = null;
                         }
                         break;
                     case 'NULL':
@@ -372,57 +394,20 @@ export class SccDocument {
                         highlightEnd = -1;
                         break;
                     default:
-                        highlightStart = bufText.length;
-                        highlightEnd = bufText.length;
+                        highlightStart = buf.bufText.length;
+                        highlightEnd = buf.bufText.length;
                 }
                 break;
             }
 
-            // Process for buffer state (only for first of pair or non-paired words)
             if (!isSecondOfPair) {
-                switch (evt.type) {
-                    case 'PAC':
-                        if (initialState === null) {
-                            initialState = {
-                                row: evt.row ?? 0,
-                                col: evt.col ?? 0,
-                                color: evt.color ?? 'White'
-                            };
-                        } else {
-                            bufText += `{R${String(evt.row ?? 0).padStart(2, '0')} C${String(evt.col ?? 0).padStart(2, '0')} ${evt.color ?? 'White'}}`;
-                        }
-                        isItalic = evt.isItalic ?? false;
-                        break;
-                    case 'TEXT':
-                        bufText += evt.text ?? '';
-                        break;
-                    case 'MIDROW':
-                        bufText += '<i>';
-                        isItalic = evt.isItalic ?? false;
-                        break;
-                    case 'INDENT':
-                        bufText += ' '.repeat(evt.spaces ?? 0);
-                        break;
-                    case 'CONTROL':
-                        if (evt.isBackspace && bufText.length > 0) {
-                            bufText = bufText.slice(0, -1);
-                        }
-                        if (isEnm(word.text) || isRcl(word.text)) {
-                            bufText = '';
-                            initialState = null;
-                        }
-                        break;
-                }
-            }
-
-            // Only increment logical index for first of pair or non-paired words
-            if (!isSecondOfPair) {
+                applyEventToBuffer(buf, evt, word.text);
                 logicalIdx++;
             }
         }
 
-        const formatted = this._formatBuffer(bufText, initialState);
-        const prefixLen = formatted.length - bufText.length;
+        const formatted = this._formatBuffer(buf.bufText, buf.initialState);
+        const prefixLen = formatted.length - buf.bufText.length;
         return {
             bufferText: formatted,
             highlightStart: highlightStart >= 0 ? highlightStart + prefixLen : -1,
@@ -451,7 +436,7 @@ export class SccDocument {
         }
 
         const sortedKeys = sortedLineNums;
-        const currentIdx = sortedKeys.indexOf(lineNum);
+        const currentIdx = binarySearchIndex(sortedKeys, lineNum);
         
         if (currentIdx === -1 || currentIdx >= sortedKeys.length - 1) {
             return { isOverflow: false, overflowCount: 0 };
@@ -483,7 +468,7 @@ export class SccDocument {
                 let overflowCount = 0;
                 
                 for (let i = 0; i < hexWords.length; i++) {
-                    const testIdx = Math.max(0, i);
+                    const testIdx = i;
                     const [testTime] = addFrames(
                         currentTs.hours, currentTs.minutes, currentTs.seconds, currentTs.frames,
                         testIdx,
@@ -518,10 +503,11 @@ export class SccDocument {
 
         // SCC004: Never-displayed captions (from neverDisplayedLines)
         for (const lineNum of this.analysis.neverDisplayedLines) {
+            const lineText = this.lines[lineNum] ?? '';
             diagnostics.push({
                 lineNum,
                 startChar: 0,
-                endChar: 0,
+                endChar: lineText.length,
                 code: 'SCC004',
                 message: 'Caption never displayed - has text but no EOC (End of Caption)',
                 severity: 'warning'
@@ -530,10 +516,11 @@ export class SccDocument {
 
         // SCC005: Never-erased captions (from neverErasedLines)
         for (const lineNum of this.analysis.neverErasedLines) {
+            const lineText = this.lines[lineNum] ?? '';
             diagnostics.push({
                 lineNum,
                 startChar: 0,
-                endChar: 0,
+                endChar: lineText.length,
                 code: 'SCC005',
                 message: 'Caption never erased - has EOC but no EDM (Erase Displayed Memory)',
                 severity: 'warning'
@@ -542,10 +529,14 @@ export class SccDocument {
 
         // SCC006: Non-monotonic timestamps (from nonMonotonicLines)
         for (const lineNum of this.analysis.nonMonotonicLines) {
+            const lineText = this.lines[lineNum] ?? '';
+            const tsMatch = lineText.match(TIMESTAMP_PATTERN);
+            const tsStart = tsMatch?.index ?? 0;
+            const tsEnd = tsMatch ? tsStart + tsMatch[0].length : lineText.length;
             diagnostics.push({
                 lineNum,
-                startChar: 0,
-                endChar: 0,
+                startChar: tsStart,
+                endChar: tsEnd,
                 code: 'SCC006',
                 message: 'Non-monotonic timestamp - timestamp goes backwards from previous line',
                 severity: 'error'
@@ -554,8 +545,4 @@ export class SccDocument {
 
         return diagnostics;
     }
-}
-
-export function createSccDocument(): SccDocument {
-    return new SccDocument();
 }

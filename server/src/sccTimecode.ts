@@ -8,7 +8,8 @@
 import * as path from 'path';
 import { TIMESTAMP_PATTERN } from './sccDecoder';
 
-// Load shared frame rate config
+// Load shared frame rate config – runtime JSON require is intentional
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const frameRatesData = require(path.join(__dirname, '../data/frame_rates.json'));
 
 export interface CadenceConfig {
@@ -157,7 +158,7 @@ export function detectFrameRate(fileText: string): [string, number] {
         }
     }
     
-    return [rate!, count];
+    return [rate, count];
 }
 
 export function validateTimestamp(tsStr: string): boolean {

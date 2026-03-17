@@ -5,13 +5,7 @@ import { SccDocument } from '../out/sccAnalyzer';
 import { iterHexWords, parseSccCode, isEoc, isEdm, isEnm, isRcl } from '../out/sccDecoder';
 import { formatBufferWithMarkers, wrapTooltipLines } from '../out/sccTooltip';
 
-const testCasesPath = path.join(__dirname, './test-cases/analyzer_cases.json');
-let testCases: any = {};
-try {
-    testCases = require(testCasesPath);
-} catch {
-    // Will create test cases below
-}
+const testCases = require(path.join(__dirname, './test-cases/analyzer_cases.json'));
 
 suite('SCC Analyzer Tests', () => {
     
@@ -272,13 +266,15 @@ Some line without timestamp
             const input = `Scenarist_SCC V1.0
 
 00:00:01:00\t9420 9420 c865 ecec ef`;
-            
+
             doc.analyze(input);
             const diagnostics = doc.collectDiagnostics();
-            
+
             const scc004 = diagnostics.find(d => d.code === 'SCC004');
             assert.ok(scc004, 'Should have SCC004 diagnostic');
             assert.strictEqual(scc004!.lineNum, 2);
+            assert.strictEqual(scc004!.startChar, 0);
+            assert.ok(scc004!.endChar > 0, 'endChar should span the line');
         });
 
         test('never erased captions produce SCC005 diagnostics', () => {
@@ -288,29 +284,33 @@ Some line without timestamp
 00:00:01:00\t9420 9420 c865 ecec ef
 
 00:00:02:00\t942f 942f`;
-            
+
             doc.analyze(input);
             const diagnostics = doc.collectDiagnostics();
-            
+
             const scc005 = diagnostics.find(d => d.code === 'SCC005');
             assert.ok(scc005, 'Should have SCC005 diagnostic');
             assert.strictEqual(scc005!.lineNum, 2);
+            assert.strictEqual(scc005!.startChar, 0);
+            assert.ok(scc005!.endChar > 0, 'endChar should span the line');
         });
 
-        test('non-monotonic timestamps produce SCC006 diagnostics', () => {
+        test('non-monotonic timestamps produce SCC006 diagnostics with timestamp range', () => {
             const doc = new SccDocument();
             const input = `Scenarist_SCC V1.0
 
 00:00:05:00\t9420 9420
 
 00:00:01:00\t942f 942f`;
-            
+
             doc.analyze(input);
             const diagnostics = doc.collectDiagnostics();
-            
+
             const scc006 = diagnostics.find(d => d.code === 'SCC006');
             assert.ok(scc006, 'Should have SCC006 diagnostic');
             assert.strictEqual(scc006!.lineNum, 4);
+            assert.strictEqual(scc006!.startChar, 0, 'timestamp starts at column 0');
+            assert.strictEqual(scc006!.endChar, 11, 'timestamp is 11 chars (HH:MM:SS:FF)');
         });
     });
 
@@ -661,6 +661,22 @@ Some line without timestamp
             assert.strictEqual(result.isOverflow, false);
         });
 
+        test('overflow detected when packets exceed frame budget', () => {
+            const doc = new SccDocument();
+            // Two timestamps 1 frame apart, but first line has many packets
+            const input = `Scenarist_SCC V1.0
+
+00:00:01:00\t9420 9420 94ad 94ad c865 ecec ef80 f7ef f2ec 6480
+
+00:00:01:01\t942f 942f`;
+
+            doc.analyze(input);
+            const result = doc.checkOverflow(2);
+
+            assert.strictEqual(result.isOverflow, true, 'Should detect overflow');
+            assert.ok(result.overflowCount > 0, 'Should report overflow count');
+        });
+
         test('last line in file: no overflow', () => {
             const doc = new SccDocument();
             const input = `Scenarist_SCC V1.0
@@ -728,6 +744,27 @@ Some line without timestamp
             assert.ok(result.timestampMap.size > 0);
             assert.ok(result.timeMap.size > 0);
         });
+    });
+
+    suite('data-driven: neverErased (from JSON)', () => {
+        for (const tc of testCases.neverErased) {
+            test(tc.name, () => {
+                const doc = new SccDocument();
+                doc.analyze(tc.input);
+                const result = doc.analyze(tc.input);
+                assert.deepStrictEqual(result.neverErasedLines, tc.expectedNeverErasedLines);
+            });
+        }
+    });
+
+    suite('data-driven: nonMonotonic (from JSON)', () => {
+        for (const tc of testCases.nonMonotonic) {
+            test(tc.name, () => {
+                const doc = new SccDocument();
+                const result = doc.analyze(tc.input);
+                assert.deepStrictEqual(result.nonMonotonicLines, tc.expectedNonMonotonicLines);
+            });
+        }
     });
 
     // Ported from reference/scc_inspector/tests/test_buffer.py

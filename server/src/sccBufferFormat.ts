@@ -4,7 +4,7 @@
  * Fast single-pass annotation rendering.
  */
 
-import { iterHexWords, parseSccCode, DecodeEvent } from './sccDecoder';
+import { iterHexWords, parseSccCode } from './sccDecoder';
 
 export interface AnnotationSegment {
     text: string;
@@ -18,7 +18,6 @@ export function renderLineAnnotation(lineText: string): AnnotationSegment[] {
     let hasContent = false;
     
     for (const word of iterHexWords(lineText)) {
-        // Skip second of paired codes
         if (word.isPaired && word.start > word.pairStart) {
             continue;
         }
