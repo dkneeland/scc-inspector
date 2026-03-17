@@ -8,7 +8,10 @@ import {
     TextDocumentSyncKind,
     InitializeResult,
     Hover,
-    MarkupKind
+    MarkupKind,
+    Diagnostic,
+    DiagnosticSeverity,
+    Range
 } from 'vscode-languageserver/node';
 
 import { TextDocument } from 'vscode-languageserver-textdocument';
@@ -21,6 +24,7 @@ const connection = createConnection(ProposedFeatures.all);
 const documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
 
 const sccDocuments: Map<string, SccDocument> = new Map();
+const pendingDiagnostics: Map<string, NodeJS.Timeout> = new Map();
 
 let hasConfigurationCapability = false;
 
@@ -96,6 +100,9 @@ connection.onDidChangeConfiguration(change => {
 documents.onDidClose(e => {
     documentSettings.delete(e.document.uri);
     sccDocuments.delete(e.document.uri);
+    clearTimeout(pendingDiagnostics.get(e.document.uri));
+    pendingDiagnostics.delete(e.document.uri);
+    connection.sendDiagnostics({ uri: e.document.uri, diagnostics: [] });
 });
 
 function getOrCreateSccDocument(uri: string): SccDocument {
@@ -107,14 +114,44 @@ function getOrCreateSccDocument(uri: string): SccDocument {
     return doc;
 }
 
+function publishDiagnostics(uri: string): void {
+    const document = documents.get(uri);
+    if (!document) return;
+    
+    const sccDoc = getOrCreateSccDocument(uri);
+    sccDoc.analyze(document.getText());
+    const rawDiagnostics = sccDoc.collectDiagnostics();
+    
+    const diagnostics: Diagnostic[] = rawDiagnostics.map(d => ({
+        severity: d.severity === 'error' ? DiagnosticSeverity.Error
+            : d.severity === 'warning' ? DiagnosticSeverity.Warning
+            : DiagnosticSeverity.Information,
+        range: Range.create(
+            d.lineNum,
+            d.startChar,
+            d.lineNum,
+            d.endChar
+        ),
+        message: d.message,
+        code: d.code,
+        source: 'scc-inspector'
+    }));
+    
+    connection.sendDiagnostics({ uri, diagnostics });
+}
+
 documents.onDidOpen(e => {
-    const sccDoc = getOrCreateSccDocument(e.document.uri);
-    sccDoc.analyze(e.document.getText());
+    publishDiagnostics(e.document.uri);
 });
 
 documents.onDidChangeContent(e => {
-    const sccDoc = getOrCreateSccDocument(e.document.uri);
-    sccDoc.analyze(e.document.getText());
+    const uri = e.document.uri;
+    
+    clearTimeout(pendingDiagnostics.get(uri));
+    pendingDiagnostics.set(uri, setTimeout(() => {
+        publishDiagnostics(uri);
+        pendingDiagnostics.delete(uri);
+    }, 500));
 });
 
 connection.onHover(

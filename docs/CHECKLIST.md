@@ -50,26 +50,25 @@ Quick-reference checklist for tracking progress. Each item references the detail
 > Details: docs/EXECUTION_GUIDE.md → Phase 2
 
 ### Implementation
-- [ ] `collectDiagnostics()` function created (Step 2.2)
-- [ ] Parity errors — `SCC001`, Error severity (Step 2.2)
-- [ ] Invalid timestamps — `SCC002`, Error severity (Step 2.2)
-- [ ] Buffer overflow — `SCC003`, Warning severity (Step 2.2)
-- [ ] Never-displayed captions — `SCC004`, Warning severity (Step 2.2)
-- [ ] Caption never erased — `SCC005`, Information severity (Step 2.2)
-- [ ] Non-monotonic timestamps — `SCC006`, Warning severity (Step 2.2)
-- [ ] Diagnostics published on document open and change (Step 2.1)
-- [ ] Re-analysis debounced at ~500ms (Step 2.4)
-- [ ] Diagnostics cleared on document close (Step 2.5)
+- [x] `collectDiagnostics()` function created (Step 2.2)
+- [x] Parity errors — `SCC001`, Error severity (Step 2.2)
+- [x] Invalid timestamps — `SCC002`, Error severity (Step 2.2)
+- [x] Buffer overflow — `SCC003`, Warning severity (Step 2.2)
+- [x] Never-displayed captions — `SCC004`, Warning severity (Step 2.2)
+- [x] Caption never erased — `SCC005`, Information severity (Step 2.2)
+- [x] Non-monotonic timestamps — `SCC006`, Warning severity (Step 2.2)
+- [x] Diagnostics published on document open and change (Step 2.1)
+- [x] Re-analysis debounced at ~500ms (Step 2.4)
+- [x] Diagnostics cleared on document close (Step 2.5)
 
 ### Tests
-- [ ] `server/test/diagnostics.test.ts` created (Step 2.6)
-- [ ] `samples/test-errors.scc` created with intentional errors (Step 2.6)
-- [ ] Parity, timestamp, overflow, never-displayed, non-monotonic test suites pass (Step 2.6)
+- [x] `samples/test-errors.scc` created with intentional errors (Step 2.6)
+- [x] Parity, timestamp, overflow, never-displayed, non-monotonic test suites pass (Step 2.6) - tests in analyzer.test.ts
 
 ### Visual Verification
-- [ ] Squiggles visible in Extension Development Host (Step 2.6)
-- [ ] Problems panel (`Ctrl+Shift+M`) lists all diagnostics (Step 2.6)
-- [ ] Clicking a diagnostic jumps to correct position (Step 2.6)
+- [x] Squiggles visible in Extension Development Host (Step 2.6)
+- [x] Problems panel (`Ctrl+Shift+M`) lists all diagnostics (Step 2.6)
+- [x] Clicking a diagnostic jumps to correct position (Step 2.6)
 
 ---
 

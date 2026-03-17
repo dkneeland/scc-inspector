@@ -2,7 +2,7 @@
   "buildTimeMap": [
     {
       "name": "basic pop-on caption",
-      "input": "Scenarist_SCC V1.0\n\n00:00:01:00\t9420 9420 94ad 94ad c865 ecec ef\n\n00:00:02:00\t942f 942f\n\n00:00:05:00\t942c 942c",
+      "input": "Scenarist_SCC V1.0\n\n00:00:01:00\t9420 9420 94ad 94ad c8e5 ecec ef\n\n00:00:02:00\t942f 942f\n\n00:00:05:00\t942c 942c",
       "expectedTimeMap": {
         "2": { "startTime": "00:00:02:00", "endTime": "00:00:05:00" }
       },
@@ -14,7 +14,7 @@
     },
     {
       "name": "multiple caption blocks",
-      "input": "Scenarist_SCC V1.0\n\n00:00:01:00\t9420 9420 c865 ef\n\n00:00:02:00\t942f 942f\n\n00:00:03:00\t942c 942c\n\n00:00:04:00\t9420 9420 c866 ef\n\n00:00:05:00\t942f 942f\n\n00:00:06:00\t942c 942c",
+      "input": "Scenarist_SCC V1.0\n\n00:00:01:00\t9420 9420 c8e5 ef\n\n00:00:02:00\t942f 942f\n\n00:00:03:00\t942c 942c\n\n00:00:04:00\t9420 9420 c8e6 ef\n\n00:00:05:00\t942f 942f\n\n00:00:06:00\t942c 942c",
       "expectedTimeMap": {
         "2": { "startTime": "00:00:02:00", "endTime": "00:00:03:00" },
         "8": { "startTime": "00:00:05:00", "endTime": "00:00:06:00" }
@@ -22,14 +22,14 @@
     },
     {
       "name": "ENM clears pending",
-      "input": "Scenarist_SCC V1.0\n\n00:00:01:00\t9420 9420 c865 ef\n\n00:00:02:00\t942e 942e",
+      "input": "Scenarist_SCC V1.0\n\n00:00:01:00\t9420 9420 c8e5 ef\n\n00:00:02:00\t94ae 94ae",
       "expectedNeverDisplayed": [2]
     }
   ],
   "bufferSnapshot": [
     {
       "name": "single text character",
-      "input": "Scenarist_SCC V1.0\n\n00:00:01:00\t94ad 94ad c865 ef",
+      "input": "Scenarist_SCC V1.0\n\n00:00:01:00\t94ad 94ad c8e5 ef",
       "lineNum": 2,
       "wordIdx": 2,
       "expectedHighlight": {
@@ -49,12 +49,12 @@
   "neverErased": [
     {
       "name": "caption with EOC but no EDM",
-      "input": "Scenarist_SCC V1.0\n\n00:00:01:00\t9420 9420 c865 ecec ef\n\n00:00:02:00\t942f 942f",
+      "input": "Scenarist_SCC V1.0\n\n00:00:01:00\t9420 9420 c8e5 ecec ef\n\n00:00:02:00\t942f 942f",
       "expectedNeverErasedLines": [2]
     },
     {
       "name": "caption with both EOC and EDM",
-      "input": "Scenarist_SCC V1.0\n\n00:00:01:00\t9420 9420 c865 ecec ef\n\n00:00:02:00\t942f 942f\n\n00:00:05:00\t942c 942c",
+      "input": "Scenarist_SCC V1.0\n\n00:00:01:00\t9420 9420 c8e5 ecec ef\n\n00:00:02:00\t942f 942f\n\n00:00:05:00\t942c 942c",
       "expectedNeverErasedLines": []
     }
   ],

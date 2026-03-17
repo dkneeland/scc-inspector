@@ -14,7 +14,7 @@ suite('SCC Analyzer Tests', () => {
             const doc = new SccDocument();
             const input = `Scenarist_SCC V1.0
 
-00:00:01:00\t9420 9420 94ad 94ad c865 ecec ef
+00:00:01:00\t9420 9420 94ad 94ad c8e5 ecec ef
 
 00:00:02:00\t942f 942f
 
@@ -33,7 +33,7 @@ suite('SCC Analyzer Tests', () => {
             const doc = new SccDocument();
             const input = `Scenarist_SCC V1.0
 
-00:00:01:00\t9420 9420 94ad 94ad c865 ecec ef
+00:00:01:00\t9420 9420 94ad 94ad c8e5 ecec ef
 
 00:00:02:00\t942f 942f
 
@@ -49,13 +49,13 @@ suite('SCC Analyzer Tests', () => {
             const doc = new SccDocument();
             const input = `Scenarist_SCC V1.0
 
-00:00:01:00\t9420 9420 c865 ecec ef
+00:00:01:00\t9420 9420 c8e5 ecec ef
 
 00:00:02:00\t942f 942f
 
 00:00:03:00\t942c 942c
 
-00:00:04:00\t9420 9420 c866 ecec ef
+00:00:04:00\t9420 9420 c8e6 ecec ef
 
 00:00:05:00\t942f 942f
 
@@ -78,9 +78,9 @@ suite('SCC Analyzer Tests', () => {
             const doc = new SccDocument();
             const input = `Scenarist_SCC V1.0
 
-00:00:01:00\t9420 9420 c865 ecec ef
+00:00:01:00\t9420 9420 c8e5 ecec ef
 
-00:00:02:00\t942e 942e
+00:00:02:00\t94ae 94ae
 
 00:00:03:00\t942f 942f`;
             
@@ -150,7 +150,7 @@ Some line without timestamp
             const doc = new SccDocument();
             const input = `Scenarist_SCC V1.0
 
-00:00:01:00\t9420 9420 94ad 94ad c865 ecec efef`;
+00:00:01:00\t9420 9420 94ad 94ad c8e5 ecec efef`;
             
             const result = doc.analyze(input);
             
@@ -166,7 +166,7 @@ Some line without timestamp
             const doc = new SccDocument();
             const input = `Scenarist_SCC V1.0
 
-00:00:01:00\t9420 9420 c865 ecec ef`;
+00:00:01:00\t9420 9420 c8e5 ecec ef`;
             
             const result = doc.analyze(input);
             
@@ -177,9 +177,9 @@ Some line without timestamp
             const doc = new SccDocument();
             const input = `Scenarist_SCC V1.0
 
-00:00:01:00\t9420 9420 c865 ecec ef
+00:00:01:00\t9420 9420 c8e5 ecec ef
 
-00:00:02:00\t942e 942e`;
+00:00:02:00\t94ae 94ae`;
             
             const result = doc.analyze(input);
             
@@ -192,7 +192,7 @@ Some line without timestamp
             const doc = new SccDocument();
             const input = `Scenarist_SCC V1.0
 
-00:00:01:00\t9420 9420 c865 ecec ef
+00:00:01:00\t9420 9420 c8e5 ecec ef
 
 00:00:02:00\t942f 942f`;
             
@@ -205,7 +205,7 @@ Some line without timestamp
             const doc = new SccDocument();
             const input = `Scenarist_SCC V1.0
 
-00:00:01:00\t9420 9420 c865 ecec ef
+00:00:01:00\t9420 9420 c8e5 ecec ef
 
 00:00:02:00\t942f 942f
 
@@ -265,7 +265,7 @@ Some line without timestamp
             const doc = new SccDocument();
             const input = `Scenarist_SCC V1.0
 
-00:00:01:00\t9420 9420 c865 ecec ef`;
+00:00:01:00\t9420 9420 c8e5 ecec ef`;
 
             doc.analyze(input);
             const diagnostics = doc.collectDiagnostics();
@@ -273,15 +273,16 @@ Some line without timestamp
             const scc004 = diagnostics.find(d => d.code === 'SCC004');
             assert.ok(scc004, 'Should have SCC004 diagnostic');
             assert.strictEqual(scc004!.lineNum, 2);
-            assert.strictEqual(scc004!.startChar, 0);
-            assert.ok(scc004!.endChar > 0, 'endChar should span the line');
+            assert.strictEqual(scc004!.severity, 'warning');
+            assert.ok(scc004!.startChar >= 12, 'startChar should start after timestamp');
+            assert.ok(scc004!.endChar > scc004!.startChar, 'endChar should span hex codes');
         });
 
         test('never erased captions produce SCC005 diagnostics', () => {
             const doc = new SccDocument();
             const input = `Scenarist_SCC V1.0
 
-00:00:01:00\t9420 9420 c865 ecec ef
+00:00:01:00\t9420 9420 c8e5 ecec ef
 
 00:00:02:00\t942f 942f`;
 
@@ -291,8 +292,57 @@ Some line without timestamp
             const scc005 = diagnostics.find(d => d.code === 'SCC005');
             assert.ok(scc005, 'Should have SCC005 diagnostic');
             assert.strictEqual(scc005!.lineNum, 2);
-            assert.strictEqual(scc005!.startChar, 0);
+            assert.strictEqual(scc005!.severity, 'info');
+            assert.ok(scc005!.startChar >= 12, 'startChar should start after timestamp');
             assert.ok(scc005!.endChar > 0, 'endChar should span the line');
+        });
+
+        test('parity errors produce SCC001 diagnostics', () => {
+            const doc = new SccDocument();
+            const input = `Scenarist_SCC V1.0
+
+00:00:01:00\t9420 9420 ffff 942f 942f`;
+
+            doc.analyze(input);
+            const diagnostics = doc.collectDiagnostics();
+
+            const scc001 = diagnostics.filter(d => d.code === 'SCC001');
+            assert.ok(scc001.length > 0, 'Should have SCC001 diagnostic for ffff');
+            assert.strictEqual(scc001[0]!.lineNum, 2);
+            assert.ok(scc001[0]!.message.toUpperCase().includes('FFFF'), 'Message should mention the invalid hex code');
+        });
+
+        test('invalid timestamps produce SCC002 diagnostics', () => {
+            const doc = new SccDocument();
+            const input = `Scenarist_SCC V1.0
+
+99:99:99:99\t9420 9420 942f 942f`;
+
+            doc.analyze(input);
+            const diagnostics = doc.collectDiagnostics();
+
+            const scc002 = diagnostics.find(d => d.code === 'SCC002');
+            assert.ok(scc002, 'Should have SCC002 diagnostic');
+            assert.strictEqual(scc002!.lineNum, 2);
+            assert.strictEqual(scc002!.startChar, 0, 'timestamp starts at column 0');
+        });
+
+        test('buffer overflow produces SCC003 diagnostics', () => {
+            const doc = new SccDocument();
+            // Two timestamps 1 frame apart, but first line has many packets
+            const input = `Scenarist_SCC V1.0
+
+00:00:01:00\t9420 9420 94ad 94ad c8e5 ecec ef80 f7ef f2ec 6480
+
+00:00:01:01\t942f 942f`;
+
+            doc.analyze(input);
+            const diagnostics = doc.collectDiagnostics();
+
+            const scc003 = diagnostics.find(d => d.code === 'SCC003');
+            assert.ok(scc003, 'Should have SCC003 diagnostic');
+            assert.strictEqual(scc003!.lineNum, 2);
+            assert.ok(scc003!.message.includes('overflow'), 'Message should mention overflow');
         });
 
         test('non-monotonic timestamps produce SCC006 diagnostics with timestamp range', () => {
@@ -311,6 +361,24 @@ Some line without timestamp
             assert.strictEqual(scc006!.lineNum, 4);
             assert.strictEqual(scc006!.startChar, 0, 'timestamp starts at column 0');
             assert.strictEqual(scc006!.endChar, 11, 'timestamp is 11 chars (HH:MM:SS:FF)');
+            assert.strictEqual(scc006!.severity, 'warning');
+        });
+
+        test('clean file produces zero diagnostics', () => {
+            const doc = new SccDocument();
+            // Uses parity-correct hex codes: c8e5="He", ecec="ll", ef80="o"
+            const input = `Scenarist_SCC V1.0
+
+00:00:01:00\t9420 9420 94ad 94ad c8e5 ecec ef80
+
+00:00:02:00\t942f 942f
+
+00:00:05:00\t942c 942c`;
+
+            doc.analyze(input);
+            const diagnostics = doc.collectDiagnostics();
+
+            assert.strictEqual(diagnostics.length, 0, 'Well-formed file should produce no diagnostics');
         });
     });
 
@@ -490,16 +558,21 @@ Some line without timestamp
 
 00:00:00:00\t942c 942c
 
-00:00:01:00\t94ad 94ad c865 ecec ef
+00:00:01:00\t94ad 94ad c8e5 ecec ef80
 
-00:00:02:00\t942e 942e
+00:00:02:00\t94ae 94ae
 
-00:00:03:00\tc866 ecec ef`;
-            
+00:00:03:00\tc8e6 ecec ef80`;
+
             doc.analyze(input);
-            const snapshot = doc.getBufferSnapshot(6, 0);
-            
-            assert.ok(!snapshot.bufferText.includes('e'));
+            // Get buffer for line 8 (after ENM on line 6)
+            // Backwards scan should stop at line 6 (ENM), so line 4's "Hello" should not leak through
+            const snapshot = doc.getBufferSnapshot(8, 0);
+
+            // Line 4 has c8e5="He", line 8 has c8e6="Hf"
+            // If ENM stops the scan, buffer should only contain line 8 content ("Hf"), not "He" from line 4
+            assert.ok(!snapshot.bufferText.includes('e'), 'Buffer should not contain "e" from line 4');
+            assert.ok(snapshot.bufferText.includes('H'), 'Buffer should contain "H" from line 8');
         });
 
         test('empty buffer returns empty string with -1 highlights', () => {
@@ -666,7 +739,7 @@ Some line without timestamp
             // Two timestamps 1 frame apart, but first line has many packets
             const input = `Scenarist_SCC V1.0
 
-00:00:01:00\t9420 9420 94ad 94ad c865 ecec ef80 f7ef f2ec 6480
+00:00:01:00\t9420 9420 94ad 94ad c8e5 ecec ef80 f7ef f2ec 6480
 
 00:00:01:01\t942f 942f`;
 
@@ -715,7 +788,7 @@ Some line without timestamp
             const doc = new SccDocument();
             const input = `Scenarist_SCC V1.0
 
-00:00:01;00\t9420 9420 c865 ecec ef
+00:00:01;00\t9420 9420 c8e5 ecec ef
 
 00:00:02;00\t942f 942f`;
             
@@ -750,7 +823,6 @@ Some line without timestamp
         for (const tc of testCases.neverErased) {
             test(tc.name, () => {
                 const doc = new SccDocument();
-                doc.analyze(tc.input);
                 const result = doc.analyze(tc.input);
                 assert.deepStrictEqual(result.neverErasedLines, tc.expectedNeverErasedLines);
             });
@@ -773,7 +845,7 @@ Some line without timestamp
             const doc = new SccDocument();
             const input = `Scenarist_SCC V1.0
 
-00:00:01:00\t9420 9440 c8e5 6c6c ef80`;
+00:00:01:00\t9420 9440 c8e5 ecec ef80`;
             
             doc.analyze(input);
             // Word index 2 is c8e5 (TEXT "He"), logicalIdx 2
@@ -796,7 +868,7 @@ Some line without timestamp
             const doc = new SccDocument();
             const input = `Scenarist_SCC V1.0
 
-00:00:01:00\t9420 9440 c8e5 6c6c ef80 942c`;
+00:00:01:00\t9420 9440 c8e5 ecec ef80 942c`;
             
             doc.analyze(input);
             // Word 5 is 942c (EDM control code), logicalIdx 5
@@ -818,7 +890,7 @@ Some line without timestamp
             const doc = new SccDocument();
             const input = `Scenarist_SCC V1.0
 
-00:00:01:00\t9420 9440 c8e5 6c6c ef80 8080`;
+00:00:01:00\t9420 9440 c8e5 ecec ef80 8080`;
             
             doc.analyze(input);
             // Word 5 is 8080 (NULL), logicalIdx 5
@@ -874,7 +946,7 @@ Some line without timestamp
             const doc = new SccDocument();
             const input = `Scenarist_SCC V1.0
 
-00:00:01:00\t9420 9440 c8e5 6c6c ef80 94e0`;
+00:00:01:00\t9420 9440 c8e5 ecec ef80 94e0`;
             
             doc.analyze(input);
             // Word 5 is 94e0 (PAC), logicalIdx 5
@@ -888,9 +960,9 @@ Some line without timestamp
             const doc = new SccDocument();
             const input = `Scenarist_SCC V1.0
 
-00:00:01:00\t9420 9440 c8e5 6c6c ef80
+00:00:01:00\t9420 9440 c8e5 ecec ef80
 
-00:00:02:00\tc8e5 6c6c ef80`;
+00:00:02:00\tc8e5 ecec ef80`;
             
             doc.analyze(input);
             // Just verify it doesn't crash - get snapshot from line 4

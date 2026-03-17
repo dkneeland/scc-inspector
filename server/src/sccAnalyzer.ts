@@ -5,8 +5,8 @@
  * Builds timing maps and buffer snapshots for diagnostic and tooltip features.
  */
 
-import { iterHexWords, parseSccCode, TIMESTAMP_PATTERN, isEoc, isEdm, isEnm, isRcl, DecodeEvent } from './sccDecoder';
-import { detectFrameRate, addFrames, parseTimestampStr, compareTimestamps } from './sccTimecode';
+import { iterHexWords, parseSccCode, TIMESTAMP_PATTERN, isEoc, isEdm, isEnm, isRcl, DecodeEvent, checkParityFast, HexWord } from './sccDecoder';
+import { detectFrameRate, addFrames, parseTimestampStr, compareTimestamps, validateTimestamp } from './sccTimecode';
 import { createHash } from 'crypto';
 
 export interface TimestampInfo {
@@ -132,7 +132,7 @@ export class SccDocument {
         const nonMonotonicLines: number[] = [];
 
         const [frameRate] = detectFrameRate(text);
-        const validFrameRate = frameRate !== 'INVALID' ? frameRate : null;
+        const validFrameRate = frameRate !== 'INVALID' ? frameRate : '29.97 NDF';
 
         const lines = this.lines;
         const pendingLines: number[] = [];
@@ -252,13 +252,12 @@ export class SccDocument {
         }
 
         const sortedLineNums = [...timestampMap.keys()].sort((a, b) => a - b);
-        const sortedKeys = sortedLineNums;
-        for (let i = 1; i < sortedKeys.length; i++) {
-            const prevEntry = timestampMap.get(sortedKeys[i - 1])!;
-            const currEntry = timestampMap.get(sortedKeys[i])!;
+        for (let i = 1; i < sortedLineNums.length; i++) {
+            const prevEntry = timestampMap.get(sortedLineNums[i - 1])!;
+            const currEntry = timestampMap.get(sortedLineNums[i])!;
             try {
                 if (compareTimestamps(currEntry.timestampStr, prevEntry.timestampStr) < 0) {
-                    nonMonotonicLines.push(sortedKeys[i]);
+                    nonMonotonicLines.push(sortedLineNums[i]);
                 }
             } catch {
                 // timestamp parsing failed; skip comparison
@@ -500,14 +499,86 @@ export class SccDocument {
     collectDiagnostics(): DiagnosticInfo[] {
         if (!this.analysis) return [];
         const diagnostics: DiagnosticInfo[] = [];
+        const { lineTexts } = this.analysis;
+
+        // Cache hex words per line — reused by SCC001/SCC003/SCC004/SCC005
+        const hexWordsCache = new Map<number, HexWord[]>();
+        const getHexWords = (lineNum: number, lineText: string): HexWord[] => {
+            let cached = hexWordsCache.get(lineNum);
+            if (!cached) {
+                cached = [...iterHexWords(lineText)];
+                hexWordsCache.set(lineNum, cached);
+            }
+            return cached;
+        };
+
+        for (const [lineNum, lineText] of lineTexts) {
+            const tsMatch = lineText.match(TIMESTAMP_PATTERN);
+
+            // SCC002: Invalid timestamps
+            if (tsMatch) {
+                const tsStr = tsMatch[0];
+                const tsStart = tsMatch.index ?? 0;
+                const tsEnd = tsStart + tsStr.length;
+
+                if (!validateTimestamp(tsStr)) {
+                    diagnostics.push({
+                        lineNum,
+                        startChar: tsStart,
+                        endChar: tsEnd,
+                        code: 'SCC002',
+                        message: `Invalid timestamp: ${tsStr} - values out of range`,
+                        severity: 'error'
+                    });
+                }
+            }
+
+            // SCC001: Parity errors
+            const hexWords = getHexWords(lineNum, lineText);
+            for (const word of hexWords) {
+                if (!checkParityFast(word.text)) {
+                    diagnostics.push({
+                        lineNum,
+                        startChar: word.start,
+                        endChar: word.end,
+                        code: 'SCC001',
+                        message: `Parity error: invalid byte in ${word.text.toUpperCase()}`,
+                        severity: 'error'
+                    });
+                }
+            }
+
+            // SCC003: Buffer overflow
+            const overflow = this.checkOverflow(lineNum);
+            if (overflow.isOverflow && overflow.overflowCount > 0) {
+                if (hexWords.length > 0 && overflow.overflowCount <= hexWords.length) {
+                    const firstOverflowIdx = hexWords.length - overflow.overflowCount;
+                    const firstWord = hexWords[firstOverflowIdx];
+                    const lastWord = hexWords[hexWords.length - 1];
+
+                    diagnostics.push({
+                        lineNum,
+                        startChar: firstWord.start,
+                        endChar: lastWord.end,
+                        code: 'SCC003',
+                        message: `Buffer overflow: ${overflow.overflowCount} packet(s) exceed next timestamp`,
+                        severity: 'warning'
+                    });
+                }
+            }
+        }
 
         // SCC004: Never-displayed captions (from neverDisplayedLines)
         for (const lineNum of this.analysis.neverDisplayedLines) {
             const lineText = this.lines[lineNum] ?? '';
+            const hexWords = getHexWords(lineNum, lineText);
+            const startChar = hexWords.length > 0 ? hexWords[0].start : 0;
+            const endChar = hexWords.length > 0 ? hexWords[hexWords.length - 1].end : lineText.length;
+
             diagnostics.push({
                 lineNum,
-                startChar: 0,
-                endChar: lineText.length,
+                startChar,
+                endChar,
                 code: 'SCC004',
                 message: 'Caption never displayed - has text but no EOC (End of Caption)',
                 severity: 'warning'
@@ -517,13 +588,17 @@ export class SccDocument {
         // SCC005: Never-erased captions (from neverErasedLines)
         for (const lineNum of this.analysis.neverErasedLines) {
             const lineText = this.lines[lineNum] ?? '';
+            const hexWords = getHexWords(lineNum, lineText);
+            const startChar = hexWords.length > 0 ? hexWords[0].start : 0;
+            const endChar = hexWords.length > 0 ? hexWords[hexWords.length - 1].end : lineText.length;
+
             diagnostics.push({
                 lineNum,
-                startChar: 0,
-                endChar: lineText.length,
+                startChar,
+                endChar,
                 code: 'SCC005',
                 message: 'Caption never erased - has EOC but no EDM (Erase Displayed Memory)',
-                severity: 'warning'
+                severity: 'info'
             });
         }
 
@@ -533,13 +608,14 @@ export class SccDocument {
             const tsMatch = lineText.match(TIMESTAMP_PATTERN);
             const tsStart = tsMatch?.index ?? 0;
             const tsEnd = tsMatch ? tsStart + tsMatch[0].length : lineText.length;
+
             diagnostics.push({
                 lineNum,
                 startChar: tsStart,
                 endChar: tsEnd,
                 code: 'SCC006',
                 message: 'Non-monotonic timestamp - timestamp goes backwards from previous line',
-                severity: 'error'
+                severity: 'warning'
             });
         }
 
