@@ -5,7 +5,7 @@ This document defines exactly how to execute each phase of the project. It is wr
 **Reference documents:**
 - `docs/PROJECT_STRATEGY.md` — High-level vision, architecture, and phased rollout
 - `docs/HANDOFF.md` — Status snapshot from initial scaffolding
-- Original project: `C:\PythonProjects\scc_inspector\` — The Notepad++ Python plugin we're porting from
+- Original project: `reference/scc_inspector/` — The Notepad++ Python plugin we're porting from (bundled in-repo for easy access)
 
 **Key principle:** Each phase ends with a definition of done. Do not move to the next phase until every item is checked.
 
@@ -172,7 +172,7 @@ cd server && npm test
 
 **Goal:** Create the core analysis engine that processes an entire SCC file and builds the timing/state maps that every subsequent feature depends on.
 
-**Source reference:** Port from `C:\PythonProjects\scc_inspector\scc_inspector.py`, functions `build_time_map()` (lines ~150-260) and `build_buffer_snapshot()` (lines ~400-543).
+**Source reference:** Port from `reference/scc_inspector/scc_inspector.py`, functions `build_time_map()` (lines ~150-260) and `build_buffer_snapshot()` (lines ~400-543).
 
 ### Step 1.1: Create `server/src/sccAnalyzer.ts`
 
