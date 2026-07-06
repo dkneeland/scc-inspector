@@ -6,6 +6,55 @@
 
 const TOOLTIP_WIDTH = 60;
 
+export const HIGHLIGHT_SENTINEL = '\u200B';
+export const INSERTION_GLYPH = '▏';
+
+export function formatBufferHighlight(
+    bufferText: string,
+    highlightStart: number,
+    highlightEnd: number,
+    isControl: boolean,
+    maxWidth: number = TOOLTIP_WIDTH
+): string[] {
+    const indent = '      ';
+    let text = bufferText;
+
+    if (!text) {
+        return [];
+    }
+
+    const hasRange = highlightStart >= 0 && highlightEnd > highlightStart;
+    if (!hasRange && isControl) {
+        text += INSERTION_GLYPH;
+    }
+
+    const lines: string[] = [];
+    let offset = 0;
+    let isFirst = true;
+    while (offset < text.length) {
+        const limit = isFirst ? maxWidth : maxWidth - indent.length;
+        const seg = text.slice(offset, offset + limit);
+        const segStart = offset;
+        const segEnd = offset + seg.length;
+        let rendered = seg;
+        if (hasRange) {
+            const s = Math.max(highlightStart, segStart);
+            const e = Math.min(highlightEnd, segEnd);
+            if (e > s) {
+                const localS = s - segStart;
+                const localE = e - segStart;
+                rendered = seg.slice(0, localS) + HIGHLIGHT_SENTINEL
+                    + seg.slice(localS, localE) + HIGHLIGHT_SENTINEL
+                    + seg.slice(localE);
+            }
+        }
+        lines.push(isFirst ? rendered : indent + rendered);
+        offset = segEnd;
+        isFirst = false;
+    }
+    return lines;
+}
+
 export interface TooltipCard {
     title: string;
     metaLines: string[];
