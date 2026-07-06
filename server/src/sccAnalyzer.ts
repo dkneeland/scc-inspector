@@ -8,6 +8,7 @@
 import { iterHexWords, parseSccCode, TIMESTAMP_PATTERN, isEoc, isEdm, isEnm, isRcl, DecodeEvent, checkParityFast, HexWord } from './sccDecoder';
 import { detectFrameRate, addFrames, parseTimestampStr, compareTimestamps, validateTimestamp } from './sccTimecode';
 import { createHash } from 'crypto';
+import { renderLineAnnotation } from './sccBufferFormat';
 
 export interface TimestampInfo {
     timestampStr: string;
@@ -569,8 +570,10 @@ export class SccDocument {
         }
 
         // SCC004: Never-displayed captions (from neverDisplayedLines)
+        // Only flag lines that actually have rendered text (skip control-only lines)
         for (const lineNum of this.analysis.neverDisplayedLines) {
             const lineText = this.lines[lineNum] ?? '';
+            if (renderLineAnnotation(lineText).length === 0) continue;
             const hexWords = getHexWords(lineNum, lineText);
             const startChar = hexWords.length > 0 ? hexWords[0].start : 0;
             const endChar = hexWords.length > 0 ? hexWords[hexWords.length - 1].end : lineText.length;
@@ -586,8 +589,10 @@ export class SccDocument {
         }
 
         // SCC005: Never-erased captions (from neverErasedLines)
+        // Only flag lines that actually have rendered text (skip control-only lines)
         for (const lineNum of this.analysis.neverErasedLines) {
             const lineText = this.lines[lineNum] ?? '';
+            if (renderLineAnnotation(lineText).length === 0) continue;
             const hexWords = getHexWords(lineNum, lineText);
             const startChar = hexWords.length > 0 ? hexWords[0].start : 0;
             const endChar = hexWords.length > 0 ? hexWords[hexWords.length - 1].end : lineText.length;
