@@ -6,14 +6,21 @@
     "server"
   ],
   "scripts": {
-    "compile": "tsc -b",
+    "compile": "tsc -b && npm run bundle",
     "watch": "tsc -b -w",
+    "bundle": "npm run bundle:server && npm run bundle:client && npm run copy-data",
+    "bundle:server": "esbuild server/src/server.ts --bundle --outfile=client/dist/server.js --platform=node --format=cjs --external:vscode",
+    "bundle:client": "esbuild client/src/extension.ts --bundle --outfile=client/dist/extension.js --platform=node --format=cjs --external:vscode",
+    "copy-data": "node -e \"require('fs').cpSync('server/data','client/data',{recursive:true})\"",
+    "package": "npm run compile && cd client && vsce package --no-dependencies",
     "test": "npm run test --workspaces",
     "lint": "eslint client/src server/src"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^20.10.0",
+    "@vscode/vsce": "^3.9.2",
+    "esbuild": "^0.28.1",
     "eslint": "^10.0.3",
     "typescript": "^5.3.0",
     "typescript-eslint": "^8.57.1"

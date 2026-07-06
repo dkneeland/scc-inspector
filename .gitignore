@@ -18,3 +18,5 @@ client/src/*.js.map
 client/src/*.d.ts
 server/test/*.js
 server/test/*.js.map
+client/dist/
+client/data/

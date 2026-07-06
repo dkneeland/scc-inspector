@@ -12,7 +12,7 @@
     "Linters"
   ],
   "activationEvents": ["onLanguage:scc"],
-  "main": "./out/extension.js",
+  "main": "./dist/extension.js",
   "contributes": {
     "languages": [
       {
@@ -51,7 +51,7 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm --prefix .. run compile",
     "compile": "tsc -b",
     "watch": "tsc -b -w",
     "test": "echo \"No tests yet\""
