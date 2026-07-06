@@ -18,7 +18,7 @@ import { TextDocument } from 'vscode-languageserver-textdocument';
 import { parseSccCode, iterHexWords, TIMESTAMP_PATTERN, HexWord } from './sccDecoder';
 import { addFrames, parseTimestampStr } from './sccTimecode';
 import { SccDocument } from './sccAnalyzer';
-import { formatTooltip, TooltipCard } from './sccTooltip';
+import { formatTooltip, formatTimestampLine, TooltipCard } from './sccTooltip';
 
 const connection = createConnection(ProposedFeatures.all);
 const documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
@@ -284,28 +284,27 @@ connection.onHover(
         const snapshotLogicalIdx = isDuplicateOfPair ? Math.max(0, logicalIdx - 1) : logicalIdx;
 
         const decoded = parseSccCode(targetWord.text, targetWord.isPaired);
-        const lbl = decoded.label ? ` (${decoded.label})` : '';
-        
+        const code = targetWord.text.toUpperCase();
+        const dupNote = 'Duplicate of a paired command. The decoder ignores this copy.';
+
         let card: TooltipCard;
         switch (decoded.type) {
             case 'TEXT':
                 card = {
                     title: 'Text',
-                    metaLines: [
-                        `"${decoded.text}"`,
-                        `\`${targetWord.text.toUpperCase()}\`${lbl ? ` - ${decoded.label}` : ''}`
-                    ]
+                    summary: `"${decoded.text}"`,
+                    code,
+                    label: decoded.label
                 };
                 break;
             case 'PAC': {
                 const ul = decoded.underline ? ' Und' : '';
                 card = {
                     title: 'Preamble Address Code',
-                    metaLines: [
-                        `Row ${decoded.row} - Col ${decoded.col} - ${decoded.color}${ul}`,
-                        `\`${targetWord.text.toUpperCase()}\`${lbl ? ` - ${decoded.label}` : ''}`
-                    ],
-                    notes: isDuplicateOfPair ? ['Duplicate of a paired command. The decoder ignores this copy.'] : undefined
+                    summary: `Row ${decoded.row} · Col ${decoded.col} · ${decoded.color}${ul}`,
+                    code,
+                    label: decoded.label,
+                    notes: isDuplicateOfPair ? [dupNote] : undefined
                 };
                 break;
             }
@@ -313,77 +312,66 @@ connection.onHover(
                 const ul2 = decoded.underline ? ' Und' : '';
                 card = {
                     title: 'Mid-Row Command',
-                    metaLines: [
-                        `${decoded.color}${ul2}`,
-                        `\`${targetWord.text.toUpperCase()}\`${lbl ? ` - ${decoded.label}` : ''}`
-                    ],
-                    notes: isDuplicateOfPair ? ['Duplicate of a paired command. The decoder ignores this copy.'] : undefined
+                    summary: `${decoded.color}${ul2}`,
+                    code,
+                    label: decoded.label,
+                    notes: isDuplicateOfPair ? [dupNote] : undefined
                 };
                 break;
             }
             case 'CONTROL':
                 card = {
                     title: decoded.name?.split('(')[0].trim() || 'Control Command',
-                    metaLines: [`\`${targetWord.text.toUpperCase()}\`${lbl ? ` - ${decoded.label}` : ''}`],
-                    notes: isDuplicateOfPair ? ['Duplicate of a paired command. The decoder ignores this copy.'] : undefined
+                    code,
+                    label: decoded.label,
+                    notes: isDuplicateOfPair ? [dupNote] : undefined
                 };
                 break;
             case 'INDENT': {
                 const n = decoded.spaces;
                 card = {
                     title: 'Indent',
-                    metaLines: [
-                        `${n} ${n === 1 ? 'space' : 'spaces'}`,
-                        `\`${targetWord.text.toUpperCase()}\`${lbl ? ` - ${decoded.label}` : ''}`
-                    ],
-                    notes: isDuplicateOfPair ? ['Duplicate of a paired command. The decoder ignores this copy.'] : undefined
+                    summary: `${n} ${n === 1 ? 'space' : 'spaces'}`,
+                    code,
+                    label: decoded.label,
+                    notes: isDuplicateOfPair ? [dupNote] : undefined
                 };
                 break;
             }
             case 'NULL':
                 card = {
                     title: 'Null / Padding',
-                    metaLines: [`\`${targetWord.text.toUpperCase()}\`${lbl ? ` - ${decoded.label}` : ''}`],
+                    code,
+                    label: decoded.label,
                     notes: ['Padding or filler code. No effect on the caption buffer.']
                 };
                 break;
             case 'ERROR':
                 card = {
                     title: 'Parity Error',
-                    metaLines: [
-                        decoded.desc || 'Parity error',
-                        `\`${targetWord.text.toUpperCase()}\`${lbl ? ` - ${decoded.label}` : ''}`
-                    ]
+                    summary: decoded.desc || 'Parity error',
+                    code
                 };
                 break;
             default:
                 card = {
                     title: 'Unknown Code',
-                    metaLines: [`\`${targetWord.text.toUpperCase()}\``]
+                    code
                 };
         }
         const analysis = sccDoc.analyze(document.getText());
         const baseTime = tsMatch[0];
         
-        let timestampDesc: string;
+        let displayTime = baseTime;
         if (analysis.frameRate) {
             try {
                 const ts = parseTimestampStr(baseTime);
-                const [pktTime] = addFrames(ts.hours, ts.minutes, ts.seconds, ts.frames, packetIdx, analysis.frameRate);
-                const pktWord = packetIdx === 1 ? 'packet' : 'packets';
-                timestampDesc = packetIdx === 0
-                    ? `\`${pktTime}\``
-                    : `\`${pktTime}\`  \nOffset: +${packetIdx} ${pktWord}`;
+                [displayTime] = addFrames(ts.hours, ts.minutes, ts.seconds, ts.frames, packetIdx, analysis.frameRate);
             } catch {
-                timestampDesc = packetIdx === 0
-                    ? `\`${baseTime}\``
-                    : `\`${baseTime}\`  \nOffset: +${packetIdx}`;
+                // Keep the raw line timestamp when frame math fails.
             }
-        } else {
-            timestampDesc = packetIdx === 0
-                ? `\`${baseTime}\`  \nFrame rate not detected`
-                : `\`${baseTime}\`  \nOffset: +${packetIdx}  \nFrame rate not detected`;
         }
+        const timestampDesc = formatTimestampLine(displayTime, packetIdx, !!analysis.frameRate);
 
         const snapshot = sccDoc.getBufferSnapshot(position.line, snapshotLogicalIdx);
         
