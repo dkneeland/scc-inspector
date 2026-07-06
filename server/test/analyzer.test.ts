@@ -185,6 +185,24 @@ Some line without timestamp
             
             assert.ok(result.neverDisplayedLines.includes(2));
         });
+
+        test('sample line with ENM RCL PAC text and same-line EOC is not never displayed', () => {
+            const doc = new SccDocument();
+            const input = `Scenarist_SCC V1.0
+
+00:00:01:15	94ae 94ae 9420 9420 94f2 94f2 9723 9723 4361 e6e6 e520 ec61 f4f4 e520 7368 eff2 f4ae 942f 942f
+
+00:00:03:08	942c 942c`;
+
+            const result = doc.analyze(input);
+
+            assert.strictEqual(result.neverDisplayedLines.includes(2), false);
+            assert.strictEqual(result.neverErasedLines.includes(2), false);
+            const timeRange = result.timeMap.get(2);
+            assert.ok(timeRange, 'Line should be tracked in timeMap');
+            assert.ok(timeRange!.startTime, 'same-line EOC should set startTime');
+            assert.ok(timeRange!.endTime, 'following EDM should set endTime');
+        });
     });
 
     suite('analyze - never erased', () => {
@@ -276,6 +294,36 @@ Some line without timestamp
             assert.strictEqual(scc004!.severity, 'warning');
             assert.ok(scc004!.startChar >= 12, 'startChar should start after timestamp');
             assert.ok(scc004!.endChar > scc004!.startChar, 'endChar should span hex codes');
+        });
+
+        test('SCC004 range starts at caption content, not leading RCL', () => {
+            const doc = new SccDocument();
+            const line = '00:00:01:00\t9420 9420 c8e5 ecec ef';
+            const input = `Scenarist_SCC V1.0
+
+${line}`;
+
+            doc.analyze(input);
+            const diagnostics = doc.collectDiagnostics();
+
+            const scc004 = diagnostics.find(d => d.code === 'SCC004');
+            assert.ok(scc004, 'Should have SCC004 diagnostic');
+            assert.strictEqual(scc004!.startChar, line.indexOf('c8e5'));
+            assert.ok(scc004!.endChar >= line.indexOf('ecec') + 4);
+        });
+
+        test('sample line with same-line EOC does not produce SCC004', () => {
+            const doc = new SccDocument();
+            const input = `Scenarist_SCC V1.0
+
+00:00:01:15	94ae 94ae 9420 9420 94f2 94f2 9723 9723 4361 e6e6 e520 ec61 f4f4 e520 7368 eff2 f4ae 942f 942f
+
+00:00:03:08	942c 942c`;
+
+            doc.analyze(input);
+            const diagnostics = doc.collectDiagnostics();
+
+            assert.strictEqual(diagnostics.some(d => d.lineNum === 2 && d.code === 'SCC004'), false);
         });
 
         test('never erased captions produce SCC005 diagnostics', () => {

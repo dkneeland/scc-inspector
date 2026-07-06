@@ -8,7 +8,6 @@
 import { iterHexWords, parseSccCode, TIMESTAMP_PATTERN, isEoc, isEdm, isEnm, isRcl, DecodeEvent, checkParityFast, HexWord } from './sccDecoder';
 import { detectFrameRate, addFrames, parseTimestampStr, compareTimestamps, validateTimestamp } from './sccTimecode';
 import { createHash } from 'crypto';
-import { renderLineAnnotation } from './sccBufferFormat';
 
 export interface TimestampInfo {
     timestampStr: string;
@@ -103,6 +102,33 @@ function binarySearchIndex(sortedArr: number[], target: number): number {
         else hi = mid - 1;
     }
     return -1;
+}
+
+function getContentRange(hexWords: HexWord[]): { startChar: number; endChar: number } | null {
+    let startChar = -1;
+    let endChar = -1;
+
+    for (const word of hexWords) {
+        if (word.isPaired && word.start > word.pairStart) {
+            continue;
+        }
+
+        const evt = parseSccCode(word.text, word.isPaired);
+        if (!['TEXT', 'PAC', 'MIDROW', 'INDENT'].includes(evt.type)) {
+            continue;
+        }
+
+        if (startChar === -1) {
+            startChar = word.pairStart;
+        }
+        endChar = word.pairEnd;
+    }
+
+    if (startChar === -1 || endChar === -1) {
+        return null;
+    }
+
+    return { startChar, endChar };
 }
 
 export class SccDocument {
@@ -570,18 +596,16 @@ export class SccDocument {
         }
 
         // SCC004: Never-displayed captions (from neverDisplayedLines)
-        // Only flag lines that actually have rendered text (skip control-only lines)
         for (const lineNum of this.analysis.neverDisplayedLines) {
             const lineText = this.lines[lineNum] ?? '';
-            if (renderLineAnnotation(lineText).length === 0) continue;
             const hexWords = getHexWords(lineNum, lineText);
-            const startChar = hexWords.length > 0 ? hexWords[0].start : 0;
-            const endChar = hexWords.length > 0 ? hexWords[hexWords.length - 1].end : lineText.length;
+            const range = getContentRange(hexWords);
+            if (!range) continue;
 
             diagnostics.push({
                 lineNum,
-                startChar,
-                endChar,
+                startChar: range.startChar,
+                endChar: range.endChar,
                 code: 'SCC004',
                 message: 'Caption never displayed - has text but no EOC (End of Caption)',
                 severity: 'warning'
@@ -589,18 +613,16 @@ export class SccDocument {
         }
 
         // SCC005: Never-erased captions (from neverErasedLines)
-        // Only flag lines that actually have rendered text (skip control-only lines)
         for (const lineNum of this.analysis.neverErasedLines) {
             const lineText = this.lines[lineNum] ?? '';
-            if (renderLineAnnotation(lineText).length === 0) continue;
             const hexWords = getHexWords(lineNum, lineText);
-            const startChar = hexWords.length > 0 ? hexWords[0].start : 0;
-            const endChar = hexWords.length > 0 ? hexWords[hexWords.length - 1].end : lineText.length;
+            const range = getContentRange(hexWords);
+            if (!range) continue;
 
             diagnostics.push({
                 lineNum,
-                startChar,
-                endChar,
+                startChar: range.startChar,
+                endChar: range.endChar,
                 code: 'SCC005',
                 message: 'Caption never erased - has EOC but no EDM (Erase Displayed Memory)',
                 severity: 'info'

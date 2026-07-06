@@ -312,20 +312,26 @@ export function getCommandByte(wordText: string): number {
     return parseInt(wordText, 16) & 0x7F;
 }
 
+function isControlWord(wordText: string): boolean {
+    const val = parseInt(wordText, 16);
+    if (isNaN(val)) return false;
+    return isControl(val & 0x7F7F);
+}
+
 export function isEoc(wordText: string): boolean {
-    return getCommandByte(wordText) === 0x2F;
+    return isControlWord(wordText) && getCommandByte(wordText) === 0x2F;
 }
 
 export function isRcl(wordText: string): boolean {
-    return getCommandByte(wordText) === 0x20;
+    return isControlWord(wordText) && getCommandByte(wordText) === 0x20;
 }
 
 export function isEnm(wordText: string): boolean {
-    return getCommandByte(wordText) === 0x2E;
+    return isControlWord(wordText) && getCommandByte(wordText) === 0x2E;
 }
 
 export function isEdm(wordText: string): boolean {
-    return getCommandByte(wordText) === 0x2C;
+    return isControlWord(wordText) && getCommandByte(wordText) === 0x2C;
 }
 
 export function checkParityFast(hexStr: string): boolean {

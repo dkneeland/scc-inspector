@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import * as path from 'path';
-import { parseSccCode, iterHexWords, decodeSingleCode, HEX_PATTERN, isPairingCommand } from '../out/sccDecoder';
+import { parseSccCode, iterHexWords, decodeSingleCode, HEX_PATTERN, isPairingCommand, isRcl, isEnm, isEoc, isEdm } from '../out/sccDecoder';
 
 const testCasesPath = path.join(__dirname, './test-cases/decoder_cases.json');
 const testCases = require(testCasesPath);
@@ -144,6 +144,15 @@ suite('Decoder Tests', () => {
                     assert.ok(result.includes(tc.expectedContains), `Expected "${tc.expectedContains}" in "${result}"`);
                 }
             });
+        });
+    });
+
+    suite('Control Helper Guards', () => {
+        test('text words do not match control helpers by masked low byte', () => {
+            assert.strictEqual(isRcl('e520'), false);
+            assert.strictEqual(isEnm('f4ae'), false);
+            assert.strictEqual(isEoc('942f'), true);
+            assert.strictEqual(isEdm('942c'), true);
         });
     });
     
