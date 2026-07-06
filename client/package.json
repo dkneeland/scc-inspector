@@ -20,6 +20,10 @@
         "aliases": ["SCC", "Scenarist Closed Caption"],
         "extensions": [".scc"],
         "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "scc-buffer",
+        "aliases": []
       }
     ],
     "grammars": [
@@ -27,6 +31,11 @@
         "language": "scc",
         "scopeName": "source.scc",
         "path": "./scc.tmLanguage.json"
+      },
+      {
+        "language": "scc-buffer",
+        "scopeName": "source.scc-buffer",
+        "path": "./scc-buffer.tmLanguage.json"
       }
     ],
     "configuration": {
