@@ -6,13 +6,19 @@
 
 const TOOLTIP_WIDTH = 60;
 
+export interface TooltipCard {
+    title: string;
+    metaLines: string[];
+    notes?: string[];
+}
+
 export function formatBufferWithMarkers(
     bufferText: string,
     highlightStart: number,
     highlightEnd: number,
-    isControl: boolean
+    isControl: boolean,
+    prefix: string = 'BUF : '
 ): [string, string] {
-    const prefix = 'BUF : ';
     let fullText = prefix + bufferText;
     
     if (isControl && bufferText) {
@@ -86,7 +92,7 @@ export function wrapTooltipLines(
 }
 
 export function formatTooltip(
-    eventDesc: string,
+    card: TooltipCard,
     timestampDesc: string,
     bufferText: string,
     highlightStart: number,
@@ -94,23 +100,46 @@ export function formatTooltip(
     isControl: boolean,
     overflowInfo?: [boolean, number]
 ): string {
-    const separator = '-'.repeat(TOOLTIP_WIDTH);
-    
     const [fullBuf, markers] = formatBufferWithMarkers(
         bufferText,
         highlightStart,
         highlightEnd,
-        isControl
+        isControl,
+        ''
     );
     const wrapped = wrapTooltipLines(fullBuf, markers);
-    
-    let bufferSection: string;
-    if (overflowInfo && overflowInfo[0]) {
-        const overflowMsg = '!!! BUFFER OVERFLOW !!!';
-        bufferSection = overflowMsg + '\n' + wrapped.join('\n');
-    } else {
-        bufferSection = wrapped.join('\n');
+
+    const sections: string[] = [`### ${card.title}`];
+
+    if (card.metaLines.length > 0) {
+        sections.push(...card.metaLines);
     }
-    
-    return `${eventDesc}\n${separator}\n${timestampDesc}\n${separator}\n${bufferSection}`;
+
+    if (card.notes && card.notes.length > 0) {
+        for (const note of card.notes) {
+            sections.push(`> ${note}`);
+        }
+    }
+
+    sections.push('');
+    sections.push('**Time**');
+    sections.push(timestampDesc);
+
+    if (overflowInfo && overflowInfo[0]) {
+        sections.push(`> **Overflow:** ${overflowInfo[1]} packet(s) past the next timestamp`);
+    }
+
+    if (!bufferText) {
+        sections.push('');
+        sections.push('**Buffer**');
+        sections.push('_empty_');
+        return sections.join('\n');
+    }
+
+    sections.push('');
+    sections.push('**Buffer**');
+    sections.push('```text');
+    sections.push(...wrapped);
+    sections.push('```');
+    return sections.join('\n');
 }

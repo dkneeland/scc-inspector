@@ -153,8 +153,14 @@ export function parseSccCode(wordText: string, _isPair: boolean = false): Decode
     const b2 = rawVal & 0xFF;
     
     // Parity check
-    if (!hasOddParity(b1) || !hasOddParity(b2)) {
-        return { type: 'ERROR', desc: 'Parity Error' };
+    const badBytes: string[] = [];
+    if (!hasOddParity(b1)) badBytes.push(`first byte ${b1.toString(16).toUpperCase().padStart(2, '0')}`);
+    if (!hasOddParity(b2)) badBytes.push(`second byte ${b2.toString(16).toUpperCase().padStart(2, '0')}`);
+    if (badBytes.length > 0) {
+        return {
+            type: 'ERROR',
+            desc: `Parity error: ${badBytes.join(' and ')} failed odd parity`
+        };
     }
     
     const ccData = rawVal & 0x7F7F;

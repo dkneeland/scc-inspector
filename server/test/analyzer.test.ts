@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { SccDocument } from '../out/sccAnalyzer';
 import { iterHexWords, parseSccCode, isEoc, isEdm, isEnm, isRcl } from '../out/sccDecoder';
-import { formatBufferWithMarkers, wrapTooltipLines } from '../out/sccTooltip';
+import { formatBufferWithMarkers, wrapTooltipLines, formatTooltip } from '../out/sccTooltip';
 
 const testCases = require(path.join(__dirname, './test-cases/analyzer_cases.json'));
 
@@ -985,6 +985,70 @@ ${line}`;
             
             assert.strictEqual(wrapped.length, 2, 'Should have 2 lines');
             assert.strictEqual(wrapped[1].trim(), '^^^^^', 'Second line should be carets');
+        });
+    });
+
+    suite('tooltip formatting', () => {
+        test('formatTooltip produces Markdown with buffer code block', () => {
+            const tooltip = formatTooltip(
+                {
+                    title: 'Preamble Address Code',
+                    metaLines: ['Row 14 - Col 4 - White', '`94F2`'],
+                    notes: ['Duplicate of a paired command. The decoder ignores this copy.']
+                },
+                '`00:00:01:19`  \nOffset: +4 packets',
+                '{R14 C04 White}Cafe',
+                0,
+                15,
+                false
+            );
+
+            assert.ok(tooltip.includes('### Preamble Address Code'));
+            assert.ok(tooltip.includes('Row 14 - Col 4 - White'));
+            assert.ok(tooltip.includes('> Duplicate of a paired command. The decoder ignores this copy.'));
+            assert.ok(tooltip.includes('**Time**'));
+            assert.ok(tooltip.includes('**Buffer**'));
+            assert.ok(tooltip.includes('```text'));
+            assert.ok(tooltip.includes('{R14 C04 White}Cafe'));
+        });
+
+        test('formatTooltip shows empty buffer inline', () => {
+            const tooltip = formatTooltip(
+                {
+                    title: 'Null / Padding',
+                    metaLines: ['`8080`'],
+                    notes: ['Padding or filler code. No effect on the caption buffer.']
+                },
+                '`00:00:01:19`  \nOffset: +4 packets',
+                '',
+                -1,
+                -1,
+                true
+            );
+
+            assert.ok(tooltip.includes('### Null / Padding'));
+            assert.ok(tooltip.includes('**Buffer**'));
+            assert.ok(tooltip.includes('_empty_'));
+            assert.ok(!tooltip.includes('```text'));
+        });
+
+        test('formatTooltip keeps overflow warning when buffer is empty', () => {
+            const tooltip = formatTooltip(
+                {
+                    title: 'Null / Padding',
+                    metaLines: ['`8080`'],
+                    notes: ['Padding or filler code. No effect on the caption buffer.']
+                },
+                '`00:00:01:19`  \nOffset: +4 packets',
+                '',
+                -1,
+                -1,
+                true,
+                [true, 3]
+            );
+
+            assert.ok(tooltip.includes('> **Overflow:** 3 packet(s) past the next timestamp'));
+            assert.ok(tooltip.includes('_empty_'));
         });
     });
 

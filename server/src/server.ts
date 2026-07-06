@@ -18,7 +18,7 @@ import { TextDocument } from 'vscode-languageserver-textdocument';
 import { parseSccCode, iterHexWords, TIMESTAMP_PATTERN, HexWord } from './sccDecoder';
 import { addFrames, parseTimestampStr } from './sccTimecode';
 import { SccDocument } from './sccAnalyzer';
-import { formatTooltip } from './sccTooltip';
+import { formatTooltip, TooltipCard } from './sccTooltip';
 
 const connection = createConnection(ProposedFeatures.all);
 const documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
@@ -38,10 +38,7 @@ connection.onInitialize((params: InitializeParams) => {
     const result: InitializeResult = {
         capabilities: {
             textDocumentSync: TextDocumentSyncKind.Incremental,
-            hoverProvider: true,
-            completionProvider: {
-                resolveProvider: true
-            }
+            hoverProvider: true
         }
     };
 
@@ -114,6 +111,67 @@ function getOrCreateSccDocument(uri: string): SccDocument {
     return doc;
 }
 
+function formatHeaderHover(document: TextDocument, sccDoc: SccDocument, lineText: string): Hover {
+    const analysis = sccDoc.analyze(document.getText());
+    const diagnostics = sccDoc.collectDiagnostics();
+    const errorCount = diagnostics.filter(d => d.severity === 'error').length;
+    const warningCount = diagnostics.filter(d => d.severity === 'warning').length;
+    const infoCount = diagnostics.filter(d => d.severity === 'info').length;
+
+    const lines = [
+        '**SCC File**',
+        `**Frame rate:** ${analysis.frameRate ?? 'unknown'}`,
+        `**Data lines:** ${analysis.timestampMap.size}`,
+        `**Diagnostics:** ${errorCount} error(s), ${warningCount} warning(s), ${infoCount} info`
+    ];
+
+    return {
+        contents: {
+            kind: MarkupKind.Markdown,
+            value: lines.join('\n')
+        },
+        range: {
+            start: { line: 0, character: 0 },
+            end: { line: 0, character: lineText.trimEnd().length }
+        }
+    };
+}
+
+function formatTimestampHover(tsMatch: RegExpMatchArray, lineNum: number, analysis: ReturnType<SccDocument['analyze']>): Hover {
+    const timestampInfo = analysis.timestampMap.get(lineNum);
+    const packetCount = timestampInfo?.packetCount ?? 0;
+    const durationFrames = Math.max(0, packetCount - 1);
+
+    let durationLine = '**Duration:** no data packets on this line';
+    if (packetCount > 0) {
+        durationLine = `**Duration:** ${durationFrames} frame${durationFrames === 1 ? '' : 's'}`;
+    }
+    if (analysis.frameRate && durationFrames > 0) {
+        try {
+            const [durationText] = addFrames(0, 0, 0, 0, durationFrames, analysis.frameRate);
+            durationLine = `**Duration:** ${durationText} (${durationFrames} frame${durationFrames === 1 ? '' : 's'})`;
+        } catch {
+            // Keep the frame-count-only fallback.
+        }
+    }
+
+    return {
+        contents: {
+            kind: MarkupKind.Markdown,
+            value: [
+                `**Timestamp:** \`${tsMatch[0]}\``,
+                `**Frame rate:** ${analysis.frameRate ?? 'unknown'}`,
+                `**Packets on line:** ${packetCount}`,
+                durationLine
+            ].join('\n')
+        },
+        range: {
+            start: { line: lineNum, character: tsMatch.index ?? 0 },
+            end: { line: lineNum, character: (tsMatch.index ?? 0) + tsMatch[0].length }
+        }
+    };
+}
+
 function publishDiagnostics(uri: string): void {
     const document = documents.get(uri);
     if (!document) return;
@@ -167,22 +225,43 @@ connection.onHover(
             end: { line: position.line, character: Number.MAX_VALUE }
         });
 
-        if (!line.match(TIMESTAMP_PATTERN)) {
+        const sccDoc = getOrCreateSccDocument(document.uri);
+
+        if (position.line === 0 && line.trim() === 'Scenarist_SCC V1.0') {
+            return formatHeaderHover(document, sccDoc, line);
+        }
+
+        const tsMatch = line.match(TIMESTAMP_PATTERN);
+        if (!tsMatch) {
             return undefined;
+        }
+
+        const tsStart = tsMatch.index ?? 0;
+        const tsEnd = tsStart + tsMatch[0].length;
+        if (position.character >= tsStart && position.character < tsEnd) {
+            return formatTimestampHover(tsMatch, position.line, sccDoc.analyze(document.getText()));
         }
 
         const hexWords = [...iterHexWords(line)];
         let targetWord: HexWord | null = null;
         let logicalIdx = 0;
         let packetIdx = 0;
+        let pairRangeWord: HexWord | null = null;
+        let pairRangeLogicalIdx = 0;
+        let pairRangePacketIdx = 0;
 
         for (const word of hexWords) {
             const isSecondOfPair = word.isPaired && word.start > word.pairStart;
             
-            // Use pair range for matching (same as Python: pair_start <= col < pair_end)
-            if (position.character >= word.pairStart && position.character < word.pairEnd) {
+            if (position.character >= word.start && position.character < word.end) {
                 targetWord = word;
                 break;
+            }
+
+            if (!pairRangeWord && position.character >= word.pairStart && position.character < word.pairEnd) {
+                pairRangeWord = word;
+                pairRangeLogicalIdx = logicalIdx;
+                pairRangePacketIdx = packetIdx;
             }
             
             packetIdx++;
@@ -193,73 +272,127 @@ connection.onHover(
         }
 
         if (!targetWord) {
-            return undefined;
+            if (!pairRangeWord) {
+                return undefined;
+            }
+            targetWord = pairRangeWord;
+            logicalIdx = pairRangeLogicalIdx;
+            packetIdx = pairRangePacketIdx;
         }
+
+        const isDuplicateOfPair = targetWord.isPaired && targetWord.start > targetWord.pairStart;
+        const snapshotLogicalIdx = isDuplicateOfPair ? Math.max(0, logicalIdx - 1) : logicalIdx;
 
         const decoded = parseSccCode(targetWord.text, targetWord.isPaired);
         const lbl = decoded.label ? ` (${decoded.label})` : '';
         
-        let eventDesc: string;
+        let card: TooltipCard;
         switch (decoded.type) {
             case 'TEXT':
-                eventDesc = `TEXT: "${decoded.text}" (${targetWord.text.toUpperCase()})${lbl}`;
+                card = {
+                    title: 'Text',
+                    metaLines: [
+                        `"${decoded.text}"`,
+                        `\`${targetWord.text.toUpperCase()}\`${lbl ? ` - ${decoded.label}` : ''}`
+                    ]
+                };
                 break;
             case 'PAC': {
                 const ul = decoded.underline ? ' Und' : '';
-                eventDesc = `PAC : Row ${decoded.row}, Col ${decoded.col}, ${decoded.color}${ul} (${targetWord.text.toUpperCase()})${lbl}`;
+                card = {
+                    title: 'Preamble Address Code',
+                    metaLines: [
+                        `Row ${decoded.row} - Col ${decoded.col} - ${decoded.color}${ul}`,
+                        `\`${targetWord.text.toUpperCase()}\`${lbl ? ` - ${decoded.label}` : ''}`
+                    ],
+                    notes: isDuplicateOfPair ? ['Duplicate of a paired command. The decoder ignores this copy.'] : undefined
+                };
                 break;
             }
             case 'MIDROW': {
                 const ul2 = decoded.underline ? ' Und' : '';
-                eventDesc = `CMD : Mid-Row: ${decoded.color?.slice(0, 3)}${ul2}${lbl}`;
+                card = {
+                    title: 'Mid-Row Command',
+                    metaLines: [
+                        `${decoded.color}${ul2}`,
+                        `\`${targetWord.text.toUpperCase()}\`${lbl ? ` - ${decoded.label}` : ''}`
+                    ],
+                    notes: isDuplicateOfPair ? ['Duplicate of a paired command. The decoder ignores this copy.'] : undefined
+                };
                 break;
             }
             case 'CONTROL':
-                eventDesc = `CMD : ${decoded.name?.split('(')[0].trim()} (${targetWord.text.toUpperCase()})${lbl}`;
+                card = {
+                    title: decoded.name?.split('(')[0].trim() || 'Control Command',
+                    metaLines: [`\`${targetWord.text.toUpperCase()}\`${lbl ? ` - ${decoded.label}` : ''}`],
+                    notes: isDuplicateOfPair ? ['Duplicate of a paired command. The decoder ignores this copy.'] : undefined
+                };
                 break;
             case 'INDENT': {
                 const n = decoded.spaces;
-                eventDesc = `CMD : Indent ${n} ${n === 1 ? 'space' : 'spaces'} (${targetWord.text.toUpperCase()})${lbl}`;
+                card = {
+                    title: 'Indent',
+                    metaLines: [
+                        `${n} ${n === 1 ? 'space' : 'spaces'}`,
+                        `\`${targetWord.text.toUpperCase()}\`${lbl ? ` - ${decoded.label}` : ''}`
+                    ],
+                    notes: isDuplicateOfPair ? ['Duplicate of a paired command. The decoder ignores this copy.'] : undefined
+                };
                 break;
             }
             case 'NULL':
-                eventDesc = `NULL: Null / Padding (${targetWord.text.toUpperCase()})${lbl}`;
+                card = {
+                    title: 'Null / Padding',
+                    metaLines: [`\`${targetWord.text.toUpperCase()}\`${lbl ? ` - ${decoded.label}` : ''}`],
+                    notes: ['Padding or filler code. No effect on the caption buffer.']
+                };
                 break;
             case 'ERROR':
-                eventDesc = `ERROR: ${decoded.desc} (${targetWord.text.toUpperCase()})${lbl}`;
+                card = {
+                    title: 'Parity Error',
+                    metaLines: [
+                        decoded.desc || 'Parity error',
+                        `\`${targetWord.text.toUpperCase()}\`${lbl ? ` - ${decoded.label}` : ''}`
+                    ]
+                };
                 break;
             default:
-                eventDesc = `UNKNOWN: ${targetWord.text.toUpperCase()}`;
+                card = {
+                    title: 'Unknown Code',
+                    metaLines: [`\`${targetWord.text.toUpperCase()}\``]
+                };
         }
-
-        const sccDoc = getOrCreateSccDocument(document.uri);
         const analysis = sccDoc.analyze(document.getText());
-        
-        const tsMatch = line.match(TIMESTAMP_PATTERN);
-        const baseTime = tsMatch ? tsMatch[0] : '';
+        const baseTime = tsMatch[0];
         
         let timestampDesc: string;
-        if (analysis.frameRate && tsMatch) {
+        if (analysis.frameRate) {
             try {
                 const ts = parseTimestampStr(baseTime);
                 const [pktTime] = addFrames(ts.hours, ts.minutes, ts.seconds, ts.frames, packetIdx, analysis.frameRate);
                 const pktWord = packetIdx === 1 ? 'packet' : 'packets';
-                timestampDesc = `TIME: ${pktTime} (+${packetIdx} ${pktWord})`;
+                timestampDesc = packetIdx === 0
+                    ? `\`${pktTime}\``
+                    : `\`${pktTime}\`  \nOffset: +${packetIdx} ${pktWord}`;
             } catch {
-                timestampDesc = `TIME: ${baseTime} (+${packetIdx})`;
+                timestampDesc = packetIdx === 0
+                    ? `\`${baseTime}\``
+                    : `\`${baseTime}\`  \nOffset: +${packetIdx}`;
             }
         } else {
-            timestampDesc = `TIME: ${baseTime} (+${packetIdx})`;
+            timestampDesc = packetIdx === 0
+                ? `\`${baseTime}\`  \nFrame rate not detected`
+                : `\`${baseTime}\`  \nOffset: +${packetIdx}  \nFrame rate not detected`;
         }
 
-        const snapshot = sccDoc.getBufferSnapshot(position.line, logicalIdx);
+        const snapshot = sccDoc.getBufferSnapshot(position.line, snapshotLogicalIdx);
         
         const isControl = decoded.type === 'CONTROL' || decoded.type === 'NULL';
         const overflow = sccDoc.checkOverflow(position.line);
         const overflowInfo: [boolean, number] | undefined = overflow.isOverflow ? [true, overflow.overflowCount] : undefined;
 
         const tooltipText = formatTooltip(
-            eventDesc,
+            card,
             timestampDesc,
             snapshot.bufferText,
             snapshot.highlightStart,
@@ -271,7 +404,7 @@ connection.onHover(
         return {
             contents: {
                 kind: MarkupKind.Markdown,
-                value: '```\n' + tooltipText + '\n```'
+                value: tooltipText
             },
             range: {
                 start: { line: position.line, character: targetWord.start },

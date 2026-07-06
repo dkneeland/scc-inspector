@@ -87,6 +87,12 @@ suite('Decoder Tests', () => {
                 assert.strictEqual(result.type, tc.expectedType);
             });
         });
+
+        test('parity error reports which byte failed', () => {
+            const result = parseSccCode('ff20');
+            assert.strictEqual(result.type, 'ERROR');
+            assert.ok(result.desc?.includes('first byte FF'));
+        });
     });
     
     suite('Line Decode Tests', () => {
