@@ -10,3 +10,11 @@ server/test/*.js.map
 .claude/
 nul
 docs/HANDOFF.md
+# Internal working area (never published)
+_workbench/
+
+client/src/*.js
+client/src/*.js.map
+client/src/*.d.ts
+server/test/*.js
+server/test/*.js.map
