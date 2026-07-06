@@ -132,3 +132,11 @@ wrap logic is then retained. Everything else in this design still applies.
   characters are invisible and inert.
 - **`scc-buffer` appears in the language picker** — accepted; it is harmless
   and matches how other extensions ship hover-only grammars.
+
+## Spike result (2026-07-06)
+
+1. Fence colorized: **PASS** — `{R14 C12 White}` rendered in a dim/italic color distinct from plain `more text` in both Dark Modern and Light Modern themes.
+2. U+200B zero-width: **PASS** — no visible gap, box, or tofu around the `.` in either theme.
+3. Scopes distinct: **PASS** — `markup.inserted.scc-buffer` (green tint) visually distinct from `comment.line.state.scc-buffer` (dim/italic) and plain text in both tested themes.
+
+**Gate result:** Proceeding to Task 4.
