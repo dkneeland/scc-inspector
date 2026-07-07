@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import * as path from 'path';
-import { parseSccCode, iterHexWords, decodeSingleCode, HEX_PATTERN, isPairingCommand, isRcl, isEnm, isEoc, isEdm } from '../out/sccDecoder';
+import { parseSccCode, iterHexWords, decodeSingleCode, HEX_PATTERN, isPairingCommand, isRcl, isEnm, isEoc, isEdm, inheritChannelLabel } from '../out/sccDecoder';
 
 const testCasesPath = path.join(__dirname, './test-cases/decoder_cases.json');
 const testCases = require(testCasesPath);
@@ -172,6 +172,41 @@ suite('Decoder Tests', () => {
                     assert.deepStrictEqual(pairs, tc.expectedPairing);
                 }
             });
+        });
+    });
+
+    suite('Channel Label', () => {
+        test('text code has no direct label (Fix A gate)', () => {
+            const evt = parseSccCode('6e64', true);
+            assert.strictEqual(evt.label, undefined);
+        });
+
+        test('another text code has no direct label', () => {
+            const evt = parseSccCode('c4ef', true);
+            assert.strictEqual(evt.label, undefined);
+        });
+
+        test('PAC CC1 retains empty label', () => {
+            const evt = parseSccCode('9452', true);
+            assert.strictEqual(evt.label, '');
+        });
+
+        test('text inherits label from preceding PAC', () => {
+            const words = [...iterHexWords('9452 9452 6e64')];
+            const label = inheritChannelLabel(words, 2);
+            assert.strictEqual(label, '');
+        });
+
+        test('inheritance returns undefined when no non-text word precedes', () => {
+            const words = [...iterHexWords('6e64')];
+            const label = inheritChannelLabel(words, 0);
+            assert.strictEqual(label, undefined);
+        });
+
+        test('inheritance walks past text to find PAC', () => {
+            const words = [...iterHexWords('9452 9452 c4ef 6e64')];
+            const label = inheritChannelLabel(words, 3);
+            assert.strictEqual(label, '');
         });
     });
 });

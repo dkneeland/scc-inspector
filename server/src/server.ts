@@ -15,7 +15,7 @@ import {
 } from 'vscode-languageserver/node';
 
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { parseSccCode, iterHexWords, TIMESTAMP_PATTERN, HexWord } from './sccDecoder';
+import { parseSccCode, iterHexWords, TIMESTAMP_PATTERN, HexWord, inheritChannelLabel } from './sccDecoder';
 import { addFrames, parseTimestampStr } from './sccTimecode';
 import { SccDocument } from './sccAnalyzer';
 import { formatTooltip, formatTimestampLine, TooltipCard } from './sccTooltip';
@@ -244,17 +244,21 @@ connection.onHover(
 
         const hexWords = [...iterHexWords(line)];
         let targetWord: HexWord | null = null;
+        let targetIdx = 0;
         let logicalIdx = 0;
         let packetIdx = 0;
+        let wordIdx = 0;
         let pairRangeWord: HexWord | null = null;
         let pairRangeLogicalIdx = 0;
         let pairRangePacketIdx = 0;
+        let pairRangeWordIdx = 0;
 
         for (const word of hexWords) {
             const isSecondOfPair = word.isPaired && word.start > word.pairStart;
             
             if (position.character >= word.start && position.character < word.end) {
                 targetWord = word;
+                targetIdx = wordIdx;
                 break;
             }
 
@@ -262,9 +266,11 @@ connection.onHover(
                 pairRangeWord = word;
                 pairRangeLogicalIdx = logicalIdx;
                 pairRangePacketIdx = packetIdx;
+                pairRangeWordIdx = wordIdx;
             }
             
             packetIdx++;
+            wordIdx++;
 
             if (!isSecondOfPair) {
                 logicalIdx++;
@@ -276,6 +282,7 @@ connection.onHover(
                 return undefined;
             }
             targetWord = pairRangeWord;
+            targetIdx = pairRangeWordIdx;
             logicalIdx = pairRangeLogicalIdx;
             packetIdx = pairRangePacketIdx;
         }
@@ -293,7 +300,7 @@ connection.onHover(
                     title: 'Text',
                     summary: `"${decoded.text}"`,
                     code,
-                    label: decoded.label
+                    label: inheritChannelLabel(hexWords, targetIdx)
                 };
                 break;
             case 'PAC': {

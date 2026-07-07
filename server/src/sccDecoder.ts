@@ -62,6 +62,23 @@ function hasOddParity(byte: number): boolean {
     return VALID_BYTES.has(byte);
 }
 
+function channelLabel(rawVal: number): string {
+    const chan = (rawVal & 0x0800) ? 1 : 0;
+    const field = (rawVal & 0x0100) ? 1 : 0;
+    const ch = field * 2 + chan + 1;
+    return ch === 1 ? '' : `CC${ch}`;
+}
+
+export function inheritChannelLabel(words: HexWord[], fromIdx: number): string | undefined {
+    for (let i = fromIdx - 1; i >= 0; i--) {
+        const evt = parseSccCode(words[i].text, words[i].isPaired);
+        if (evt.label !== undefined) {
+            return evt.label;
+        }
+    }
+    return undefined;
+}
+
 export interface HexWord {
     text: string;
     start: number;
@@ -164,14 +181,10 @@ export function parseSccCode(wordText: string, _isPair: boolean = false): Decode
     }
     
     const ccData = rawVal & 0x7F7F;
-    const chan = (rawVal & 0x0800) ? 1 : 0;
-    const field = (rawVal & 0x0100) ? 1 : 0;
-    const channel = field * 2 + chan + 1;
-    const label = channel === 1 ? '' : `CC${channel}`;
     
     // Tab offset
     if (isTabOffset(ccData)) {
-        return { type: 'INDENT', label, spaces: (ccData & 0xFF) - 0x20 };
+        return { type: 'INDENT', label: channelLabel(rawVal), spaces: (ccData & 0xFF) - 0x20 };
     }
     
     // Control command
@@ -181,7 +194,7 @@ export function parseSccCode(wordText: string, _isPair: boolean = false): Decode
         if (name) {
             return {
                 type: 'CONTROL',
-                label,
+                label: channelLabel(rawVal),
                 name,
                 isNewline: cmdByte === 0x2D,
                 isBackspace: cmdByte === 0x21
@@ -209,7 +222,7 @@ export function parseSccCode(wordText: string, _isPair: boolean = false): Decode
         
         return {
             type: 'PAC',
-            label,
+            label: channelLabel(rawVal),
             row,
             col,
             color,
@@ -224,7 +237,7 @@ export function parseSccCode(wordText: string, _isPair: boolean = false): Decode
         const color = colorIdx < COLOR_LIST.length ? COLOR_LIST[colorIdx] : 'White';
         return {
             type: 'MIDROW',
-            label,
+            label: channelLabel(rawVal),
             color,
             underline: Boolean(ccData & 1),
             isItalic: color === 'Italics'
@@ -237,7 +250,6 @@ export function parseSccCode(wordText: string, _isPair: boolean = false): Decode
         if (idx >= 0 && idx < CHAR_MAP.length) {
             return {
                 type: 'TEXT',
-                label,
                 text: CHAR_MAP[idx],
                 isExtended: false
             };
@@ -255,7 +267,6 @@ export function parseSccCode(wordText: string, _isPair: boolean = false): Decode
         if (idx >= 0 && idx < CHAR_MAP.length) {
             return {
                 type: 'TEXT',
-                label,
                 text: CHAR_MAP[idx],
                 isExtended: true
             };
@@ -276,10 +287,10 @@ export function parseSccCode(wordText: string, _isPair: boolean = false): Decode
         if (c2 >= 0 && c2 < CHAR_MAP.length) {
             chars += CHAR_MAP[c2];
         }
-        return { type: 'TEXT', label, text: chars };
+        return { type: 'TEXT', text: chars };
     }
     
-    return { type: 'UNKNOWN', label, raw: word };
+    return { type: 'UNKNOWN', raw: word };
 }
 
 export function decodeSingleCode(wordText: string, isPair: boolean = false): string {
