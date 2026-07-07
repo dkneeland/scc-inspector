@@ -63,8 +63,9 @@ suite('formatTooltip (B2 layout)', () => {
         assert.strictEqual(tooltip, [
             '```scc-buffer',
             `{R14 C12 White}  Oh${ZW}.${ZW}`,
+            '─'.repeat(60),
             '```',
-            '**Text  "."**  ·  `AE80` · CC2',
+            '**"."**  ·  `AE80` CC2',
             '',
             '`00:00:43:18` · offset +9 packets'
         ].join('\n'));
@@ -84,16 +85,27 @@ suite('formatTooltip (B2 layout)', () => {
         assert.ok(tooltip.includes(INSERTION_GLYPH));
     });
 
-    test('notes render as blockquotes after the time line', () => {
+    test('dup suffix appends to the identity line', () => {
         const card: TooltipCard = {
             title: 'Preamble Address Code',
             summary: 'Row 14 · Col 4 · White',
             code: '94F2',
-            notes: ['Duplicate of a paired command. The decoder ignores this copy.']
+            dup: true
         };
         const tooltip = formatTooltip(card, '`00:00:01:19` · offset +4 packets', '{R14 C04 White}Cafe', 0, 15, false);
+        assert.ok(tooltip.includes(' · dup (ignored)'));
+        assert.ok(!tooltip.includes('> Duplicate'));
+    });
+
+    test('real notes render as blockquotes after the time line', () => {
+        const card: TooltipCard = {
+            title: 'Null / Padding',
+            code: '8080',
+            notes: ['Padding or filler code. No effect on the caption buffer.']
+        };
+        const tooltip = formatTooltip(card, '`00:00:01:19` · offset +4 packets', '', -1, -1, true);
         const lines = tooltip.split('\n');
-        assert.strictEqual(lines[lines.length - 1], '> Duplicate of a paired command. The decoder ignores this copy.');
+        assert.strictEqual(lines[lines.length - 1], '> Padding or filler code. No effect on the caption buffer.');
     });
 
     test('empty buffer shows empty fence and italic placeholder', () => {

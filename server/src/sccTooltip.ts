@@ -9,6 +9,7 @@ export interface TooltipCard {
     code: string;
     label?: string;
     notes?: string[];
+    dup?: boolean;
 }
 
 export function formatBufferHighlight(
@@ -79,22 +80,26 @@ export function formatTooltip(
 ): string {
     const sections: string[] = [];
 
+    const SEP = '─'.repeat(TOOLTIP_WIDTH);
+
     if (bufferText) {
         sections.push('```scc-buffer');
         sections.push(...formatBufferHighlight(bufferText, highlightStart, highlightEnd, isControl));
+        sections.push(SEP);
         sections.push('```');
     } else {
         sections.push('```scc-buffer');
-        sections.push('');
+        sections.push(SEP);
         sections.push('```');
         sections.push('');
         sections.push('*Buffer empty*');
         sections.push('');
     }
 
-    const summaryPart = card.summary ? `  ${card.summary}` : '';
-    const labelPart = card.label ? ` · ${card.label}` : '';
-    sections.push(`**${card.title}${summaryPart}**  ·  \`${card.code}\`${labelPart}`);
+    const lead = card.summary ?? card.title;
+    const labelPart = card.label ? ` ${card.label}` : '';
+    const dupPart = card.dup ? ' · dup (ignored)' : '';
+    sections.push(`**${lead}**  ·  \`${card.code}\`${labelPart}${dupPart}`);
     sections.push('');
     sections.push(timestampDesc);
 

@@ -21,6 +21,11 @@
       "comment": "Insertion point marker for control codes that add no text",
       "name": "markup.inserted.glyph.scc-buffer",
       "match": "▏"
+    },
+    {
+      "comment": "Buffer area bottom separator line",
+      "name": "comment.line.separator.scc-buffer",
+      "match": "─+"
     }
   ]
 }

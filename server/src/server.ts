@@ -285,7 +285,6 @@ connection.onHover(
 
         const decoded = parseSccCode(targetWord.text, targetWord.isPaired);
         const code = targetWord.text.toUpperCase();
-        const dupNote = 'Duplicate of a paired command. The decoder ignores this copy.';
 
         let card: TooltipCard;
         switch (decoded.type) {
@@ -304,7 +303,7 @@ connection.onHover(
                     summary: `Row ${decoded.row} · Col ${decoded.col} · ${decoded.color}${ul}`,
                     code,
                     label: decoded.label,
-                    notes: isDuplicateOfPair ? [dupNote] : undefined
+                    dup: isDuplicateOfPair
                 };
                 break;
             }
@@ -315,7 +314,7 @@ connection.onHover(
                     summary: `${decoded.color}${ul2}`,
                     code,
                     label: decoded.label,
-                    notes: isDuplicateOfPair ? [dupNote] : undefined
+                    dup: isDuplicateOfPair
                 };
                 break;
             }
@@ -324,7 +323,7 @@ connection.onHover(
                     title: decoded.name?.split('(')[0].trim() || 'Control Command',
                     code,
                     label: decoded.label,
-                    notes: isDuplicateOfPair ? [dupNote] : undefined
+                    dup: isDuplicateOfPair
                 };
                 break;
             case 'INDENT': {
@@ -334,7 +333,7 @@ connection.onHover(
                     summary: `${n} ${n === 1 ? 'space' : 'spaces'}`,
                     code,
                     label: decoded.label,
-                    notes: isDuplicateOfPair ? [dupNote] : undefined
+                    dup: isDuplicateOfPair
                 };
                 break;
             }
@@ -350,7 +349,8 @@ connection.onHover(
                 card = {
                     title: 'Parity Error',
                     summary: decoded.desc || 'Parity error',
-                    code
+                    code,
+                    label: decoded.label
                 };
                 break;
             default:
