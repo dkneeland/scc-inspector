@@ -296,7 +296,7 @@ Some line without timestamp
             assert.ok(tr!.startTime, 'should have startTime');
             
             const ts = parseTimestampStr('00:00:00:24');
-            const [expectedStart] = addFrames(ts.hours, ts.minutes, ts.seconds, ts.frames, 7, '25');
+            const [expectedStart] = addFrames(ts.hours, ts.minutes, ts.seconds, ts.frames, 4, '25');
             assert.strictEqual(tr!.startTime, expectedStart);
         });
     });

@@ -200,7 +200,6 @@ export class SccDocument {
                 
                 if (isSecondOfPair) {
                     packetCount++;
-                    wordIdx++;
                     continue;
                 }
 

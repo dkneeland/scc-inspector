@@ -358,3 +358,17 @@ export function checkParityFast(hexStr: string): boolean {
     if (isNaN(val)) return false;
     return hasOddParity((val >> 8) & 0xFF) && hasOddParity(val & 0xFF);
 }
+
+export function checkParityByte(byte: number): boolean {
+    return VALID_BYTES.has(byte);
+}
+
+export function findParityErrors(lineText: string): { start: number; end: number; code: string }[] {
+    const errors: { start: number; end: number; code: string }[] = [];
+    for (const word of iterHexWords(lineText)) {
+        if (!checkParityFast(word.text)) {
+            errors.push({ start: word.start, end: word.end, code: word.text });
+        }
+    }
+    return errors;
+}

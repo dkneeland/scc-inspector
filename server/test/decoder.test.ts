@@ -5,6 +5,9 @@ import { parseSccCode, iterHexWords, decodeSingleCode, HEX_PATTERN, isPairingCom
 const testCasesPath = path.join(__dirname, './test-cases/decoder_cases.json');
 const testCases = require(testCasesPath);
 
+const controlCasesPath = path.join(__dirname, './test-cases/control_commands_cases.json');
+const controlCases = require(controlCasesPath);
+
 suite('Decoder Tests', () => {
     
     suite('Standard Characters', () => {
@@ -149,6 +152,26 @@ suite('Decoder Tests', () => {
                 if (tc.expectedContains) {
                     assert.ok(result.includes(tc.expectedContains), `Expected "${tc.expectedContains}" in "${result}"`);
                 }
+            });
+        });
+    });
+
+    suite('Control Commands', () => {
+        controlCases.control_commands.forEach((tc: any) => {
+            test(tc.expectedName || `decode ${tc.input}`, () => {
+                const evt = parseSccCode(tc.input);
+                assert.strictEqual(evt.type, tc.expectedType);
+                assert.ok(evt.name);
+            });
+        });
+    });
+
+    suite('Tab Offsets', () => {
+        controlCases.tab_offsets.forEach((tc: any) => {
+            test(tc.description || `decode ${tc.input}`, () => {
+                const evt = parseSccCode(tc.input);
+                assert.strictEqual(evt.type, tc.expectedType);
+                assert.strictEqual(evt.spaces, tc.expectedSpaces);
             });
         });
     });
