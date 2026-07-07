@@ -65,7 +65,7 @@ suite('formatTooltip (B2 layout)', () => {
             `{R14 C12 White}  Oh${ZW}.${ZW}`,
             '─'.repeat(60),
             '```',
-            '**"."**  ·  `AE80` CC2',
+            '**"."** · `AE80` CC2',
             '',
             '`00:00:43:18` · offset +9 packets'
         ].join('\n'));
@@ -81,7 +81,7 @@ suite('formatTooltip (B2 layout)', () => {
     test('card without summary or label renders compact identity line', () => {
         const card: TooltipCard = { title: 'End of Caption', code: '942F' };
         const tooltip = formatTooltip(card, '`00:00:43:18`', '{R14 C12 White}  Oh.', -1, -1, true);
-        assert.ok(tooltip.includes('**End of Caption**  ·  `942F`'));
+        assert.ok(tooltip.includes('**End of Caption** · `942F`'));
         assert.ok(tooltip.includes(INSERTION_GLYPH));
     });
 

@@ -95,7 +95,7 @@ export function formatTooltip(
     const lead = card.summary ?? card.title;
     const labelPart = card.label ? ` ${card.label}` : '';
     const dupPart = card.dup ? ' · dup (ignored)' : '';
-    sections.push(`**${lead}**  ·  \`${card.code}\`${labelPart}${dupPart}`);
+    sections.push(`**${lead}** · \`${card.code}\`${labelPart}${dupPart}`);
     sections.push('');
     sections.push(timestampDesc);
 
