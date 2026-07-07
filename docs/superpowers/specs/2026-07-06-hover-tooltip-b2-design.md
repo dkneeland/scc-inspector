@@ -87,9 +87,12 @@ only place that changes.
   at the buffer end — same role as today's end-of-buffer caret.
 - The caret-weaving half of `wrapTooltipLines()` (marker-line interleaving,
   caret right-alignment onto following segments) is **deleted**. Wrapping at
-  `TOOLTIP_WIDTH` with the 6-space continuation indent is kept, since hover
-  code fences do not soft-wrap. When a highlight spans a wrap boundary, each
-  wrapped segment gets its own sentinel pair so coloring survives the wrap.
+  `TOOLTIP_WIDTH` keeps continuation lines at column 0 (no indent) — the
+  fenced code block itself serves as the visual container, so a continuation
+  indent is no longer needed (originally kept from the caret-marker era;
+  dropped after observing the rendered hover). When a highlight spans a wrap
+  boundary, each wrapped segment gets its own sentinel pair so coloring
+  survives the wrap.
 - Sentinel insertion happens **after** wrapping positions are computed, so
   zero-width characters never distort column math.
 

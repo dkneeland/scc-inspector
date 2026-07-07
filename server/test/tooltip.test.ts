@@ -35,22 +35,22 @@ suite('formatBufferHighlight', () => {
         assert.deepStrictEqual(formatBufferHighlight('', -1, -1, true), []);
     });
 
-    test('wraps at 60 chars with 6-space continuation indent', () => {
+    test('wraps at 60 chars, no continuation indent', () => {
         const lines = formatBufferHighlight('A'.repeat(80), -1, -1, false);
-        assert.deepStrictEqual(lines, ['A'.repeat(60), '      ' + 'A'.repeat(20)]);
+        assert.deepStrictEqual(lines, ['A'.repeat(60), 'A'.repeat(20)]);
     });
 
     test('sentinels never distort wrap geometry', () => {
         const lines = formatBufferHighlight('A'.repeat(80), 10, 20, false);
         assert.strictEqual(stripZW(lines[0]), 'A'.repeat(60));
-        assert.strictEqual(stripZW(lines[1]), '      ' + 'A'.repeat(20));
+        assert.strictEqual(stripZW(lines[1]), 'A'.repeat(20));
     });
 
     test('highlight spanning a wrap boundary gets a sentinel pair per segment', () => {
         const lines = formatBufferHighlight('B'.repeat(80), 55, 65, false);
         assert.strictEqual(lines.length, 2);
         assert.strictEqual(lines[0], 'B'.repeat(55) + ZW + 'B'.repeat(5) + ZW);
-        assert.strictEqual(lines[1], '      ' + ZW + 'B'.repeat(5) + ZW + 'B'.repeat(15));
+        assert.strictEqual(lines[1], ZW + 'B'.repeat(5) + ZW + 'B'.repeat(15));
     });
 });
 

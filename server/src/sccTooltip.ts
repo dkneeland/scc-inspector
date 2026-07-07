@@ -19,7 +19,6 @@ export function formatBufferHighlight(
     isControl: boolean,
     maxWidth: number = TOOLTIP_WIDTH
 ): string[] {
-    const indent = '      ';
     let text = bufferText;
 
     if (!text) {
@@ -33,10 +32,8 @@ export function formatBufferHighlight(
 
     const lines: string[] = [];
     let offset = 0;
-    let isFirst = true;
     while (offset < text.length) {
-        const limit = isFirst ? maxWidth : maxWidth - indent.length;
-        const seg = text.slice(offset, offset + limit);
+        const seg = text.slice(offset, offset + maxWidth);
         const segStart = offset;
         const segEnd = offset + seg.length;
         let rendered = seg;
@@ -51,9 +48,8 @@ export function formatBufferHighlight(
                     + seg.slice(localE);
             }
         }
-        lines.push(isFirst ? rendered : indent + rendered);
+        lines.push(rendered);
         offset = segEnd;
-        isFirst = false;
     }
     return lines;
 }
