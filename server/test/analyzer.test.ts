@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { SccDocument } from '../out/sccAnalyzer';
 import { iterHexWords, parseSccCode, isEoc, isEdm, isEnm, isRcl } from '../out/sccDecoder';
+import { addFrames, parseTimestampStr } from '../out/sccTimecode';
 
 
 const testCases = require(path.join(__dirname, './test-cases/analyzer_cases.json'));
@@ -275,6 +276,28 @@ Some line without timestamp
             assert.ok(result.timestampMap.has(2));
             const ti = result.timestampMap.get(2);
             assert.strictEqual(ti!.packetCount, 6, '6 hex words total should be counted');
+        });
+    });
+
+    suite('analyze - 25fps time mapping', () => {
+        test('EOC time advances monotonically for paired PAC at 25fps', () => {
+            const doc = new SccDocument();
+            const input = `Scenarist_SCC V1.0
+
+00:00:00:24\t9420 9420 94ae 94ae 9470 9470 c1c2 942f 942f`;
+
+            doc.analyze(input);
+            const analysis = doc.getAnalysis();
+            assert.ok(analysis);
+            assert.strictEqual(analysis!.frameRate, '25');
+
+            const tr = analysis!.timeMap.get(2);
+            assert.ok(tr, 'should have time entry for line 2');
+            assert.ok(tr!.startTime, 'should have startTime');
+            
+            const ts = parseTimestampStr('00:00:00:24');
+            const [expectedStart] = addFrames(ts.hours, ts.minutes, ts.seconds, ts.frames, 7, '25');
+            assert.strictEqual(tr!.startTime, expectedStart);
         });
     });
 
@@ -705,7 +728,7 @@ ${line}`;
             // 94ae 94ae (ENM pair) -> both at logicalIdx 0
             // 9420 9420 (RCL pair) -> both at logicalIdx 1
             // 9452 9452 (PAC pair) -> both at logicalIdx 2
-            // 97a1 97a1 (PAC pair) -> both at logicalIdx 3
+            // 97a1 97a1 (INDENT pair) -> both at logicalIdx 3
             // 5768 (text, unpaired) -> logicalIdx 4
             // e9ec (text, unpaired) -> logicalIdx 5
             // e520 (text, unpaired) -> logicalIdx 6
@@ -718,7 +741,7 @@ ${line}`;
             // e96e (text, unpaired) -> logicalIdx 13
             // 6480 (text, unpaired) -> logicalIdx 14
             // 9470 9470 (PAC pair) -> both at logicalIdx 15
-            // 9723 9723 (PAC pair) -> both at logicalIdx 16
+            // 9723 9723 (INDENT pair) -> both at logicalIdx 16
             // f468 (text, unpaired) -> logicalIdx 17
             // e973 (text, unpaired) -> logicalIdx 18
             
@@ -918,6 +941,64 @@ ${line}`;
             const snapshot = doc.getBufferSnapshot(4, 0);
             // Basic test that function executes without error
             assert.ok(true, 'Should handle multiple lines without error');
+        });
+
+        test('INVALID frame rate produces null frameRate and detectedFrameRate INVALID', () => {
+            const doc = new SccDocument();
+            // Frame value > 29 (invalidThreshold) triggers INVALID detection
+            const input = `Scenarist_SCC V1.0
+
+00:00:01:00\t9420 9420 94ad 94ad c8e5 ecec ef
+
+00:00:02:30\t942f 942f
+
+00:00:05:00\t942c 942c`;
+
+            const result = doc.analyze(input);
+            assert.strictEqual(result.frameRate, null, 'frameRate should be null when INVALID');
+            assert.strictEqual(result.detectedFrameRate, 'INVALID', 'detectedFrameRate should report INVALID');
+        });
+
+        test('cross-line channelLabel inherited from preceding line PAC', () => {
+            const doc = new SccDocument();
+            // Line 2: ENM + RCL + PAC (CC1 — empty label)
+            // Line 4: TEXT after PAC on previous line — inherits channelLabel
+            const input = `Scenarist_SCC V1.0
+
+00:00:01:00\t94ae 94ae 9420 9420 9452 9452 c8e5 ecec ef80
+
+00:00:02:00\t6ee5 77e1
+
+00:00:03:00\t942f 942f
+
+00:00:04:00\t942c 942c`;
+
+            doc.analyze(input);
+            // Line 2 is 0-indexed line 2 (00:00:01:00), line 4 is 00:00:02:00 (TEXT)
+            // TEXT at logicalIdx 0 on line 4 should inherit the channel label from preceding PAC
+            const snapshot = doc.getBufferSnapshot(4, 0);
+            // PAC at line 2 is CC1 → label is '' (empty string for default channel)
+            assert.notStrictEqual(snapshot.channelLabel, undefined, 'TEXT should inherit a channel label across lines');
+        });
+
+        test('analyze version param returns cached result on matching version', () => {
+            const doc = new SccDocument();
+            const input = `Scenarist_SCC V1.0
+
+00:00:01:00\t9420 9420 94ad 94ad c8e5 ecec ef
+
+00:00:02:00\t942f 942f
+
+00:00:05:00\t942c 942c`;
+
+            // First call with version 1 — warms the cache
+            const result1 = doc.analyze(input, 1);
+            // Second call with same version — should return from cache
+            const result2 = doc.analyze(input, 1);
+            assert.strictEqual(result1, result2, 'Matching version should return same object reference');
+            // Different version — should re-analyze
+            const result3 = doc.analyze(input, 2);
+            assert.ok(result3 !== result2 || result3.frameRate === result2.frameRate, 'Different version should produce equivalent analysis');
         });
     });
 });

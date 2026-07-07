@@ -15,7 +15,7 @@ import {
 } from 'vscode-languageserver/node';
 
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { parseSccCode, iterHexWords, TIMESTAMP_PATTERN, HexWord, inheritChannelLabel } from './sccDecoder';
+import { parseSccCode, iterHexWords, TIMESTAMP_PATTERN, HexWord } from './sccDecoder';
 import { addFrames, parseTimestampStr } from './sccTimecode';
 import { SccDocument } from './sccAnalyzer';
 import { formatTooltip, formatTimestampLine, TooltipCard } from './sccTooltip';
@@ -112,7 +112,7 @@ function getOrCreateSccDocument(uri: string): SccDocument {
 }
 
 function formatHeaderHover(document: TextDocument, sccDoc: SccDocument, lineText: string): Hover {
-    const analysis = sccDoc.analyze(document.getText());
+    const analysis = sccDoc.analyze(document.getText(), document.version);
     const diagnostics = sccDoc.collectDiagnostics();
     const errorCount = diagnostics.filter(d => d.severity === 'error').length;
     const warningCount = diagnostics.filter(d => d.severity === 'warning').length;
@@ -120,9 +120,10 @@ function formatHeaderHover(document: TextDocument, sccDoc: SccDocument, lineText
 
     const lines = [
         '**SCC File**',
-        `**Frame rate:** ${analysis.frameRate ?? 'unknown'}`,
-        `**Data lines:** ${analysis.timestampMap.size}`,
-        `**Diagnostics:** ${errorCount} error(s), ${warningCount} warning(s), ${infoCount} info`
+        '',
+        `- **Frame rate:** ${analysis.detectedFrameRate ?? 'unknown'}`,
+        `- **Data lines:** ${analysis.timestampMap.size}`,
+        `- **Diagnostics:** ${errorCount} error(s), ${warningCount} warning(s), ${infoCount} info`
     ];
 
     return {
@@ -159,9 +160,9 @@ function formatTimestampHover(tsMatch: RegExpMatchArray, lineNum: number, analys
         contents: {
             kind: MarkupKind.Markdown,
             value: [
-                `**Timestamp:** \`${tsMatch[0]}\``,
-                `**Frame rate:** ${analysis.frameRate ?? 'unknown'}`,
-                `**Packets on line:** ${packetCount}`,
+                `- **Timestamp:** \`${tsMatch[0]}\``,
+                `- **Frame rate:** ${analysis.detectedFrameRate ?? 'unknown'}`,
+                `- **Packets on line:** ${packetCount}`,
                 durationLine
             ].join('\n')
         },
@@ -177,7 +178,7 @@ function publishDiagnostics(uri: string): void {
     if (!document) return;
     
     const sccDoc = getOrCreateSccDocument(uri);
-    sccDoc.analyze(document.getText());
+    sccDoc.analyze(document.getText(), document.version);
     const rawDiagnostics = sccDoc.collectDiagnostics();
     
     const diagnostics: Diagnostic[] = rawDiagnostics.map(d => ({
@@ -239,26 +240,22 @@ connection.onHover(
         const tsStart = tsMatch.index ?? 0;
         const tsEnd = tsStart + tsMatch[0].length;
         if (position.character >= tsStart && position.character < tsEnd) {
-            return formatTimestampHover(tsMatch, position.line, sccDoc.analyze(document.getText()));
+            return formatTimestampHover(tsMatch, position.line, sccDoc.analyze(document.getText(), document.version));
         }
 
         const hexWords = [...iterHexWords(line)];
         let targetWord: HexWord | null = null;
-        let targetIdx = 0;
         let logicalIdx = 0;
         let packetIdx = 0;
-        let wordIdx = 0;
         let pairRangeWord: HexWord | null = null;
         let pairRangeLogicalIdx = 0;
         let pairRangePacketIdx = 0;
-        let pairRangeWordIdx = 0;
 
         for (const word of hexWords) {
             const isSecondOfPair = word.isPaired && word.start > word.pairStart;
             
             if (position.character >= word.start && position.character < word.end) {
                 targetWord = word;
-                targetIdx = wordIdx;
                 break;
             }
 
@@ -266,11 +263,9 @@ connection.onHover(
                 pairRangeWord = word;
                 pairRangeLogicalIdx = logicalIdx;
                 pairRangePacketIdx = packetIdx;
-                pairRangeWordIdx = wordIdx;
             }
             
             packetIdx++;
-            wordIdx++;
 
             if (!isSecondOfPair) {
                 logicalIdx++;
@@ -282,7 +277,6 @@ connection.onHover(
                 return undefined;
             }
             targetWord = pairRangeWord;
-            targetIdx = pairRangeWordIdx;
             logicalIdx = pairRangeLogicalIdx;
             packetIdx = pairRangePacketIdx;
         }
@@ -299,8 +293,7 @@ connection.onHover(
                 card = {
                     title: 'Text',
                     summary: `"${decoded.text}"`,
-                    code,
-                    label: inheritChannelLabel(hexWords, targetIdx)
+                    code
                 };
                 break;
             case 'PAC': {
@@ -318,7 +311,7 @@ connection.onHover(
                 const ul2 = decoded.underline ? ' Und' : '';
                 card = {
                     title: 'Mid-Row Command',
-                    summary: `${decoded.color}${ul2}`,
+                    summary: `Mid-Row · ${decoded.color}${ul2}`,
                     code,
                     label: decoded.label,
                     dup: isDuplicateOfPair
@@ -366,7 +359,7 @@ connection.onHover(
                     code
                 };
         }
-        const analysis = sccDoc.analyze(document.getText());
+        const analysis = sccDoc.analyze(document.getText(), document.version);
         const baseTime = tsMatch[0];
         
         let displayTime = baseTime;
@@ -381,6 +374,9 @@ connection.onHover(
         const timestampDesc = formatTimestampLine(displayTime, packetIdx, !!analysis.frameRate);
 
         const snapshot = sccDoc.getBufferSnapshot(position.line, snapshotLogicalIdx);
+        if (decoded.type === 'TEXT' && snapshot.channelLabel !== undefined) {
+            card.label = snapshot.channelLabel;
+        }
         
         const isControl = decoded.type === 'CONTROL' || decoded.type === 'NULL';
         const overflow = sccDoc.checkOverflow(position.line);

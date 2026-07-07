@@ -12,6 +12,7 @@
     "declaration": true,
     "composite": true
   },
+  "exclude": ["**/test/**", "**/*.test.ts"],
   "references": [
     { "path": "./client" },
     { "path": "./server" }

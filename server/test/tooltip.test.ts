@@ -116,7 +116,7 @@ suite('formatTooltip (B2 layout)', () => {
         };
         const tooltip = formatTooltip(card, '`00:00:01:19` · offset +4 packets', '', -1, -1, true);
         assert.ok(tooltip.includes('```scc-buffer'));
-        assert.ok(tooltip.includes('*Buffer empty*'));
+        assert.ok(tooltip.includes('Buffer empty'));
         assert.ok(tooltip.includes('> Padding or filler code. No effect on the caption buffer.'));
     });
 
@@ -124,7 +124,7 @@ suite('formatTooltip (B2 layout)', () => {
         const card: TooltipCard = { title: 'Null / Padding', code: '8080' };
         const tooltip = formatTooltip(card, '`00:00:01:19`', '', -1, -1, true, [true, 3]);
         assert.ok(tooltip.includes('> **Overflow:** 3 packet(s) past the next timestamp'));
-        assert.ok(tooltip.includes('*Buffer empty*'));
+        assert.ok(tooltip.includes('Buffer empty'));
     });
 });
 
@@ -146,5 +146,38 @@ suite('formatTimestampLine', () => {
             formatTimestampLine('00:00:43:09', 9, false),
             '`00:00:43:09` · offset +9 packets · *frame rate not detected*'
         );
+    });
+});
+
+suite('escapeMarkdownInline (internal)', () => {
+    test('escapes asterisk inside bold', () => {
+        const card: TooltipCard = {
+            title: 'Text',
+            summary: '"Hello *World*"',
+            code: 'AE80'
+        };
+        const tooltip = formatTooltip(card, '`00:00:01:00`', '', -1, -1, true);
+        // The bold markdown should survive because * is escaped
+        assert.ok(tooltip.includes('**"Hello \\*World\\*"**'), 'asterisks inside bold should be escaped: ' + tooltip);
+    });
+
+    test('brackets and backslash are escaped', () => {
+        const card: TooltipCard = {
+            title: 'Text',
+            summary: '"test [text] \\stuff"',
+            code: 'AE80'
+        };
+        const tooltip = formatTooltip(card, '`00:00:01:00`', '', -1, -1, true);
+        assert.ok(tooltip.includes('**"test \\[text\\] \\\\stuff"**'), 'brackets and backslash should be escaped');
+    });
+
+    test('underscore and backtick are escaped', () => {
+        const card: TooltipCard = {
+            title: 'Text',
+            summary: '"a_b `code`"',
+            code: 'AE80'
+        };
+        const tooltip = formatTooltip(card, '`00:00:01:00`', '', -1, -1, true);
+        assert.ok(tooltip.includes('**"a\\_b \\`code\\`"**'), 'underscore and backtick should be escaped: ' + tooltip);
     });
 });

@@ -1,0 +1,4 @@
+# TypeScript declaration files generated when running compile-tests
+test/*.d.ts
+test/*.js
+test/*.js.map

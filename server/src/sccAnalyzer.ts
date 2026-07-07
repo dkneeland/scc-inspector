@@ -23,6 +23,7 @@ export interface BufferSnapshot {
     bufferText: string;
     highlightStart: number;
     highlightEnd: number;
+    channelLabel?: string;
 }
 
 export interface OverflowResult {
@@ -41,6 +42,7 @@ export interface DiagnosticInfo {
 
 export interface AnalysisResult {
     frameRate: string | null;
+    detectedFrameRate: string;
     timestampMap: Map<number, TimestampInfo>;
     timeMap: Map<number, TimeRange>;
     lineTexts: Map<number, string>;
@@ -54,9 +56,11 @@ interface BufferState {
     bufText: string;
     initialState: { row: number; col: number; color: string } | null;
     isItalic: boolean;
+    lastLabel?: string;
 }
 
 function applyEventToBuffer(state: BufferState, evt: DecodeEvent, wordText: string): void {
+    if (evt.label !== undefined) state.lastLabel = evt.label;
     switch (evt.type) {
         case 'PAC':
             if (state.initialState === null) {
@@ -133,19 +137,25 @@ function getContentRange(hexWords: HexWord[]): { startChar: number; endChar: num
 
 export class SccDocument {
     private contentHash: string = '';
+    private version: number | undefined = undefined;
     private analysis: AnalysisResult | null = null;
     private rawText: string = '';
     private lines: string[] = [];
 
-    analyze(text: string): AnalysisResult {
+    analyze(text: string, version?: number): AnalysisResult {
+        if (this.analysis !== null && version !== undefined && version === this.version) {
+            return this.analysis;
+        }
         const newHash = createHash('md5').update(text).digest('hex');
         if (this.analysis && this.contentHash === newHash) {
+            this.version = version;
             return this.analysis;
         }
         
         this.rawText = text;
         this.lines = text.split(/\r?\n/);
         this.contentHash = newHash;
+        this.version = version;
         this.analysis = this._performAnalysis(text);
         return this.analysis;
     }
@@ -158,8 +168,8 @@ export class SccDocument {
         const neverErasedLines: number[] = [];
         const nonMonotonicLines: number[] = [];
 
-        const [frameRate] = detectFrameRate(text);
-        const validFrameRate = frameRate !== 'INVALID' ? frameRate : '29.97 NDF';
+        const [detectedFrameRate] = detectFrameRate(text);
+        const validFrameRate = detectedFrameRate !== 'INVALID' ? detectedFrameRate : null;
 
         const lines = this.lines;
         const pendingLines: number[] = [];
@@ -293,6 +303,7 @@ export class SccDocument {
 
         return {
             frameRate: validFrameRate,
+            detectedFrameRate,
             timestampMap,
             timeMap,
             lineTexts,
@@ -356,7 +367,7 @@ export class SccDocument {
 
         const currentLineText = lines[lineNum];
         if (!currentLineText) {
-            return { bufferText: this._formatBuffer(buf.bufText, buf.initialState), highlightStart: -1, highlightEnd: -1 };
+            return { bufferText: this._formatBuffer(buf.bufText, buf.initialState), highlightStart: -1, highlightEnd: -1, channelLabel: buf.lastLabel };
         }
 
         const hexWords = [...iterHexWords(currentLineText)];
@@ -437,7 +448,8 @@ export class SccDocument {
         return {
             bufferText: formatted,
             highlightStart: highlightStart >= 0 ? highlightStart + prefixLen : -1,
-            highlightEnd: highlightEnd >= 0 ? highlightEnd + prefixLen : -1
+            highlightEnd: highlightEnd >= 0 ? highlightEnd + prefixLen : -1,
+            channelLabel: buf.lastLabel
         };
     }
 

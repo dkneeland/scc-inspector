@@ -12,6 +12,10 @@ export interface TooltipCard {
     dup?: boolean;
 }
 
+function escapeMarkdownInline(s: string): string {
+    return s.replace(/[\\`*_[\]]/g, '\\$&');
+}
+
 export function formatBufferHighlight(
     bufferText: string,
     highlightStart: number,
@@ -85,14 +89,13 @@ export function formatTooltip(
         sections.push('```');
     } else {
         sections.push('```scc-buffer');
+        sections.push('Buffer empty');
         sections.push(SEP);
         sections.push('```');
         sections.push('');
-        sections.push('*Buffer empty*');
-        sections.push('');
     }
 
-    const lead = card.summary ?? card.title;
+    const lead = escapeMarkdownInline(card.summary ?? card.title);
     const labelPart = card.label ? ` ${card.label}` : '';
     const dupPart = card.dup ? ' · dup (ignored)' : '';
     sections.push(`**${lead}** · \`${card.code}\`${labelPart}${dupPart}`);

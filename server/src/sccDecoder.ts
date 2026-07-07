@@ -170,13 +170,15 @@ export function parseSccCode(wordText: string, _isPair: boolean = false): Decode
     const b2 = rawVal & 0xFF;
     
     // Parity check
-    const badBytes: string[] = [];
-    if (!hasOddParity(b1)) badBytes.push(`first byte ${b1.toString(16).toUpperCase().padStart(2, '0')}`);
-    if (!hasOddParity(b2)) badBytes.push(`second byte ${b2.toString(16).toUpperCase().padStart(2, '0')}`);
-    if (badBytes.length > 0) {
+    const b1Bad = !hasOddParity(b1);
+    const b2Bad = !hasOddParity(b2);
+    if (b1Bad || b2Bad) {
+        const parts: string[] = [];
+        if (b1Bad) parts.push(`first byte ${b1.toString(16).toUpperCase().padStart(2, '0')}`);
+        if (b2Bad) parts.push(`second byte ${b2.toString(16).toUpperCase().padStart(2, '0')}`);
         return {
             type: 'ERROR',
-            desc: `Parity error: ${badBytes.join(' and ')} failed odd parity`
+            desc: `Parity error: ${parts.join(' and ')} failed odd parity`
         };
     }
     

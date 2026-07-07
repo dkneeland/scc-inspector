@@ -16,6 +16,7 @@
       "name": "25",
       "videoFps": 25,
       "isDropFrame": false,
+      "cadenceNote": "6 packets / 5 frames: SCC is sampled at 30 Hz, so 25 fps content repeats frame 4 every sixth sample (0,1,2,3,4,4 cycle).",
       "cadence": {
         "packets": 6,
         "frames": 5

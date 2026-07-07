@@ -940,25 +940,83 @@
   "pair_detection": [
     {
       "line": "9420 9420",
-      "expectedPaired": [
-        true,
-        true
-      ]
+      "expectedPaired": [true, true],
+      "description": "RCL control paired"
+    },
+    {
+      "line": "942f 942f",
+      "expectedPaired": [true, true],
+      "description": "EOC control paired"
+    },
+    {
+      "line": "94ae 94ae",
+      "expectedPaired": [true, true],
+      "description": "ENM control paired"
+    },
+    {
+      "line": "942c 942c",
+      "expectedPaired": [true, true],
+      "description": "EDM control paired"
+    },
+    {
+      "line": "9470 9470",
+      "expectedPaired": [true, true],
+      "description": "PAC paired"
+    },
+    {
+      "line": "9140 9140",
+      "expectedPaired": [true, true],
+      "description": "PAC row 1 paired"
     },
     {
       "line": "9470 9470 9470",
-      "expectedPaired": [
-        true,
-        true,
-        false
-      ]
+      "expectedPaired": [true, true, false],
+      "description": "triple PAC: first two paired, third standalone"
+    },
+    {
+      "line": "97a1 97a1",
+      "expectedPaired": [true, true],
+      "description": "tab offset 1 paired"
+    },
+    {
+      "line": "97a2 97a2",
+      "expectedPaired": [true, true],
+      "description": "tab offset 2 paired"
+    },
+    {
+      "line": "9723 9723",
+      "expectedPaired": [true, true],
+      "description": "tab offset 3 paired"
+    },
+    {
+      "line": "9120 9120",
+      "expectedPaired": [true, true],
+      "description": "midrow white paired"
+    },
+    {
+      "line": "91a1 91a1",
+      "expectedPaired": [true, true],
+      "description": "midrow green paired"
+    },
+    {
+      "line": "9470 9470 97a1 97a1",
+      "expectedPaired": [true, true, true, true],
+      "description": "PAC pair then tab offset pair"
+    },
+    {
+      "line": "9470 9470 9723 9723",
+      "expectedPaired": [true, true, true, true],
+      "description": "PAC pair then indent-3 pair"
+    },
+    {
+      "line": "94ae 94ae 9420 9420 9470 9470 97a1 97a1 9723 9723 942f 942f",
+      "expectedPaired": [true, true, true, true, true, true, true, true, true, true, true, true],
+      "description": "full caption line: ENM RCL PAC TO TO EOC"
     },
     {
       "line": "c1c2 c1c2",
-      "expectedPaired": [
-        false,
-        false
-      ]
+      "expectedPaired": [false, false],
+      "description": "text NOT paired"
     }
   ],
   "hex_pattern": [
@@ -969,9 +1027,59 @@
   ],
   "pairing_command_tests": [
     {
+      "input": "9420",
+      "isPairingCommand": true,
+      "description": "RCL control is pairing command"
+    },
+    {
+      "input": "942f",
+      "isPairingCommand": true,
+      "description": "EOC control is pairing command"
+    },
+    {
+      "input": "94ae",
+      "isPairingCommand": true,
+      "description": "ENM control is pairing command"
+    },
+    {
+      "input": "942c",
+      "isPairingCommand": true,
+      "description": "EDM control is pairing command"
+    },
+    {
       "input": "9140",
       "isPairingCommand": true,
       "description": "PAC is pairing command"
+    },
+    {
+      "input": "9470",
+      "isPairingCommand": true,
+      "description": "PAC row 14 is pairing command"
+    },
+    {
+      "input": "97a1",
+      "isPairingCommand": true,
+      "description": "tab offset 1 col is a pairing command"
+    },
+    {
+      "input": "97a2",
+      "isPairingCommand": true,
+      "description": "tab offset 2 col is a pairing command"
+    },
+    {
+      "input": "9723",
+      "isPairingCommand": true,
+      "description": "tab offset 3 col is a pairing command"
+    },
+    {
+      "input": "9120",
+      "isPairingCommand": true,
+      "description": "midrow white is a pairing command"
+    },
+    {
+      "input": "91a1",
+      "isPairingCommand": true,
+      "description": "midrow green is a pairing command"
     },
     {
       "input": "c1c2",
@@ -995,14 +1103,14 @@
     {
       "line": "9420 9420 c1c2 9470 9470",
       "expectedWordCount": 5,
-      "expectedPairing": [
-        true,
-        true,
-        false,
-        true,
-        true
-      ],
+      "expectedPairing": [true, true, false, true, true],
       "description": "Iterator with pairing"
+    },
+    {
+      "line": "94ae 94ae 9420 9420 9470 9470 97a1 97a1 9723 9723 c1c2 942f 942f",
+      "expectedWordCount": 13,
+      "expectedPairing": [true, true, true, true, true, true, true, true, true, true, false, true, true],
+      "description": "Full caption: ENM RCL PAC TO TO text EOC"
     }
   ]
 }

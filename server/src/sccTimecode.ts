@@ -65,6 +65,106 @@ export function parseTimestampStr(tsStr: string): Timestamp {
     };
 }
 
+/**
+ * Convert a packet offset to a frame offset, accounting for frame rate cadence.
+ *
+ * For fractional frame rates at 30 Hz sampling (e.g. 23.98 at 5/4, 25 at 6/5),
+ * not every packet represents a new frame — some repeat the previous frame count.
+ * The cadence configuration defines how many packets complete a cycle and how
+ * many frames that cycle advances.  Non-fractional rates (null cadence) use 1:1.
+ */
+export function packetsToFrames(packetOffset: number, cadence: CadenceConfig | null): number {
+    if (cadence) {
+        const p = cadence.packets;
+        const f = cadence.frames;
+        return Math.floor(packetOffset / p) * f + Math.min(packetOffset % p, f - 1);
+    }
+    return packetOffset;
+}
+
+/**
+ * Convert H:M:S:F to a continuous total frame count.
+ *
+ * Non-drop-frame: plain arithmetic.
+ * Drop-frame:     apply SMPTE 12M-1999 drop-frame compensation — subtract 2
+ *                 frames (or 4 for 59.94) for every minute of elapsed time
+ *                 that is NOT divisible by 10.
+ */
+export function timecodeToFrames(
+    hours: number,
+    minutes: number,
+    seconds: number,
+    frames: number,
+    frameRateStr: string
+): number {
+    const config = getFrameRateConfig(frameRateStr);
+    const fps = config.videoFps;
+
+    let total = (hours * 3600 + minutes * 60 + seconds) * fps + frames;
+
+    if (config.isDropFrame) {
+        const dropPerMin = fps === 30 ? 2 : 4;
+        const totalMinutes = hours * 60 + minutes;
+        const numDrop = totalMinutes - Math.floor(totalMinutes / 10);
+        total -= numDrop * dropPerMin;
+    }
+
+    return total;
+}
+
+/**
+ * Convert a continuous total frame count back to an H:M:S:F timecode string.
+ *
+ * Non-drop-frame: simple division by fps.
+ * Drop-frame:     SMPTE 12M-1999 reverse — add back the dropped frames via
+ *                 the canonical ten-minute-cycle algorithm, then divide.
+ *
+ * The result is zero-padded with the correct separator (';' for DF, ':' for NDF).
+ */
+export function framesToTimecode(totalFrames: number, frameRateStr: string): string {
+    const config = getFrameRateConfig(frameRateStr);
+    const fps = config.videoFps;
+    const isDf = config.isDropFrame;
+
+    let hh: number, mm: number, ss: number, ff: number;
+
+    if (!isDf) {
+        const totalSecs = Math.floor(totalFrames / fps);
+        ff = totalFrames % fps;
+        hh = Math.floor(totalSecs / 3600);
+        mm = Math.floor((totalSecs % 3600) / 60);
+        ss = totalSecs % 60;
+    } else {
+        // SMPTE 12M-1999 drop-frame algorithm
+        const framesPerMinNominal = fps * 60;
+        const dropPerMin = fps === 30 ? 2 : 4;
+        const tenMinCycleFrames = framesPerMinNominal * 10 - dropPerMin * 9;
+
+        const num10MinCycles = Math.floor(totalFrames / tenMinCycleFrames);
+        const remaining = totalFrames % tenMinCycleFrames;
+
+        const framesPerMinDrop = framesPerMinNominal - dropPerMin;
+
+        let dropAdj = 0;
+        if (remaining >= framesPerMinNominal) {
+            const numMinPastFirst = Math.floor((remaining - framesPerMinNominal) / framesPerMinDrop) + 1;
+            dropAdj = numMinPastFirst * dropPerMin;
+        }
+
+        const totalDropAdj = num10MinCycles * 9 * dropPerMin + dropAdj;
+        const nominalTotal = totalFrames + totalDropAdj;
+
+        ff = nominalTotal % fps;
+        const totalSecs = Math.floor(nominalTotal / fps);
+        hh = Math.floor(totalSecs / 3600);
+        mm = Math.floor((totalSecs % 3600) / 60);
+        ss = totalSecs % 60;
+    }
+
+    const sep = isDf ? ';' : ':';
+    return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}${sep}${String(ff).padStart(2, '0')}`;
+}
+
 export function addFrames(
     hours: number,
     minutes: number,
@@ -74,47 +174,9 @@ export function addFrames(
     frameRateStr: string
 ): [string, number] {
     const config = getFrameRateConfig(frameRateStr);
-    const videoFps = config.videoFps;
-    const isDf = config.isDropFrame;
-    const cadence = config.cadence;
-    
-    let frameOffset: number;
-    if (cadence) {
-        const packetsPerCycle = cadence.packets;
-        const framesPerCycle = cadence.frames;
-        frameOffset = Math.floor(packetOffset / packetsPerCycle) * framesPerCycle + 
-                      Math.min(packetOffset % packetsPerCycle, framesPerCycle - 1);
-    } else {
-        frameOffset = packetOffset;
-    }
-    
-    let ff = frames + frameOffset;
-    let ss = seconds;
-    let mm = minutes;
-    let hh = hours;
-    
-    while (ff >= videoFps) {
-        ff -= videoFps;
-        ss += 1;
-    }
-    
-    while (ss >= 60) {
-        ss -= 60;
-        mm += 1;
-        if (isDf && mm % 10 !== 0 && ff < 2) {
-            ff = 2;
-        }
-    }
-    
-    while (mm >= 60) {
-        mm -= 60;
-        hh += 1;
-    }
-    
-    const sep = isDf ? ';' : ':';
-    const result = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}${sep}${String(ff).padStart(2, '0')}`;
-    
-    return [result, frameOffset];
+    const fo = packetsToFrames(packetOffset, config.cadence);
+    const total = timecodeToFrames(hours, minutes, seconds, frames, frameRateStr) + fo;
+    return [framesToTimecode(total, frameRateStr), fo];
 }
 
 export function detectFrameRate(fileText: string): [string, number] {
@@ -164,7 +226,17 @@ export function detectFrameRate(fileText: string): [string, number] {
 export function validateTimestamp(tsStr: string): boolean {
     try {
         const ts = parseTimestampStr(tsStr);
-        return ts.hours <= 23 && ts.minutes <= 59 && ts.seconds <= 59 && ts.frames <= 29;
+        if (isNaN(ts.hours) || isNaN(ts.minutes) || isNaN(ts.seconds) || isNaN(ts.frames)) return false;
+        if (ts.hours > 23 || ts.minutes > 59 || ts.seconds > 59) return false;
+        if (ts.frames > 29) return false;
+
+        // DF-specific: frames 0 and 1 are dropped at minute starts
+        // not divisible by 10 (except minute 0 itself).
+        if (tsStr.includes(';') && ts.seconds === 0 && ts.minutes % 10 !== 0 && ts.frames < 2) {
+            return false;
+        }
+
+        return true;
     } catch {
         return false;
     }

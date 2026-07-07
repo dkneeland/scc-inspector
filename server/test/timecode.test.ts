@@ -65,6 +65,17 @@ suite('Timecode Tests', () => {
                 assert.strictEqual(resultOffset, tc.expectedOffset);
             });
         });
+
+        test('25fps cadence is monotonically non-decreasing', () => {
+            let prev = '';
+            for (let offset = 0; offset < 250; offset++) {
+                const [tc] = addFrames(0, 0, 0, 0, offset, '25');
+                if (prev && compareTimestamps(tc, prev) < 0) {
+                    assert.fail(`offset ${offset} produced ${tc} which goes backwards from ${prev}`);
+                }
+                prev = tc;
+            }
+        });
     });
     
     suite('Add Frames - 29.97 NDF', () => {
@@ -92,6 +103,26 @@ suite('Timecode Tests', () => {
                 assert.strictEqual(resultTc, tc.expectedTc);
                 assert.strictEqual(resultOffset, tc.expectedOffset);
             });
+        });
+
+        test('29.97 DF multi-packet after minute boundary', () => {
+            const [tc1] = addFrames(1, 0, 59, 29, 1, '29.97 DF');
+            assert.strictEqual(tc1, '01:01:00;02');
+            const [tc2] = addFrames(1, 0, 59, 29, 2, '29.97 DF');
+            assert.strictEqual(tc2, '01:01:00;03');
+            const [tc3] = addFrames(1, 0, 59, 29, 3, '29.97 DF');
+            assert.strictEqual(tc3, '01:01:00;04');
+            const [tc4] = addFrames(1, 0, 59, 29, 4, '29.97 DF');
+            assert.strictEqual(tc4, '01:01:00;05');
+        });
+
+        test('29.97 DF 10-minute boundary skips drop', () => {
+            const [tc1] = addFrames(0, 9, 59, 29, 1, '29.97 DF');
+            assert.strictEqual(tc1, '00:10:00;00');
+            const [tc2] = addFrames(0, 9, 59, 29, 2, '29.97 DF');
+            assert.strictEqual(tc2, '00:10:00;01');
+            const [tc3] = addFrames(0, 9, 59, 29, 3, '29.97 DF');
+            assert.strictEqual(tc3, '00:10:00;02');
         });
     });
     
