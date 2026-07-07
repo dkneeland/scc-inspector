@@ -24,7 +24,7 @@
     },
     {
       "comment": "Buffer area bottom separator line",
-      "name": "comment.line.separator.scc-buffer",
+      "name": "comment.line.state.scc-buffer",
       "match": "─+"
     }
   ]
