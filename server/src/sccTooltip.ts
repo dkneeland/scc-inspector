@@ -89,6 +89,7 @@ export function formatTooltip(
         sections.push('```');
         sections.push('');
         sections.push('*Buffer empty*');
+        sections.push('');
     }
 
     const summaryPart = card.summary ? `  ${card.summary}` : '';
