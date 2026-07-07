@@ -84,12 +84,17 @@ export function formatTooltip(
         sections.push(...formatBufferHighlight(bufferText, highlightStart, highlightEnd, isControl));
         sections.push('```');
     } else {
+        sections.push('```scc-buffer');
+        sections.push('');
+        sections.push('```');
+        sections.push('');
         sections.push('*Buffer empty*');
     }
 
     const summaryPart = card.summary ? `  ${card.summary}` : '';
     const labelPart = card.label ? ` · ${card.label}` : '';
     sections.push(`**${card.title}${summaryPart}**  ·  \`${card.code}\`${labelPart}`);
+    sections.push('');
     sections.push(timestampDesc);
 
     if (overflowInfo && overflowInfo[0]) {

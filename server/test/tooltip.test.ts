@@ -65,6 +65,7 @@ suite('formatTooltip (B2 layout)', () => {
             `{R14 C12 White}  Oh${ZW}.${ZW}`,
             '```',
             '**Text  "."**  ·  `AE80` · CC2',
+            '',
             '`00:00:43:18` · offset +9 packets'
         ].join('\n'));
     });
@@ -95,15 +96,15 @@ suite('formatTooltip (B2 layout)', () => {
         assert.strictEqual(lines[lines.length - 1], '> Duplicate of a paired command. The decoder ignores this copy.');
     });
 
-    test('empty buffer renders italic placeholder, no fence', () => {
+    test('empty buffer shows empty fence and italic placeholder', () => {
         const card: TooltipCard = {
             title: 'Null / Padding',
             code: '8080',
             notes: ['Padding or filler code. No effect on the caption buffer.']
         };
         const tooltip = formatTooltip(card, '`00:00:01:19` · offset +4 packets', '', -1, -1, true);
+        assert.ok(tooltip.includes('```scc-buffer'));
         assert.ok(tooltip.includes('*Buffer empty*'));
-        assert.ok(!tooltip.includes('```'));
         assert.ok(tooltip.includes('> Padding or filler code. No effect on the caption buffer.'));
     });
 

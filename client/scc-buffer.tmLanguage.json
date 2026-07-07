@@ -8,7 +8,7 @@
       "match": "(\u200B)([^\u200B]*)(\u200B)",
       "captures": {
         "1": { "name": "punctuation.definition.inserted.begin.scc-buffer" },
-        "2": { "name": "markup.inserted.scc-buffer" },
+        "2": { "name": "markup.inserted.scc-buffer markup.underline.scc-buffer" },
         "3": { "name": "punctuation.definition.inserted.end.scc-buffer" }
       }
     },
