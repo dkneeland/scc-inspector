@@ -60,13 +60,11 @@ connection.onInitialized(() => {
 interface SCCSettings {
     hoverEnabled: boolean;
     decorationsEnabled: boolean;
-    annotationsEnabled: boolean;
 }
 
 const defaultSettings: SCCSettings = {
     hoverEnabled: true,
-    decorationsEnabled: true,
-    annotationsEnabled: true
+    decorationsEnabled: true
 };
 
 let globalSettings: SCCSettings = defaultSettings;

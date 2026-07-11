@@ -50,11 +50,6 @@
           "type": "boolean",
           "default": true,
           "description": "Enable inline decorations and error highlighting"
-        },
-        "sccInspector.annotationsEnabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable decoded caption annotations"
         }
       }
     }
