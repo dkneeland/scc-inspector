@@ -7,6 +7,30 @@ export interface LensData {
     command: string;
 }
 
+export interface SymbolData {
+    name: string;
+    detail: string;
+    line: number;
+}
+
+const MAX_SYMBOL_NAME = 40;
+
+export function buildDocumentSymbols(analysis: AnalysisResult): SymbolData[] {
+    const symbols: SymbolData[] = [];
+    for (const [lineNum, lineText] of analysis.lineTexts) {
+        const segments = renderLineAnnotation(lineText);
+        let name = segments.map(s => s.text).join('').trim();
+        if (!name) continue;
+        if (name.length > MAX_SYMBOL_NAME) {
+            name = name.slice(0, MAX_SYMBOL_NAME) + '…';
+        }
+        const tr = analysis.timeMap.get(lineNum);
+        const detail = tr?.startTime && tr?.endTime ? `${tr.startTime} → ${tr.endTime}` : '';
+        symbols.push({ name, detail, line: lineNum });
+    }
+    return symbols.sort((a, b) => a.line - b.line);
+}
+
 export function buildCodeLenses(analysis: AnalysisResult): LensData[] {
     const lenses: LensData[] = [];
     for (const [lineNum, lineText] of analysis.lineTexts) {

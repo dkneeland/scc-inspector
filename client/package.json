@@ -50,6 +50,12 @@
           "type": "boolean",
           "default": true,
           "description": "Enable inline decorations and error highlighting"
+        },
+        "sccInspector.frameRateOverride": {
+          "type": "string",
+          "enum": ["auto", "23.98", "25", "29.97 DF", "29.97 NDF"],
+          "default": "auto",
+          "description": "Override the auto-detected frame rate"
         }
       }
     }

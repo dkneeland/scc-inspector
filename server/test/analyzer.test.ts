@@ -1002,3 +1002,26 @@ ${line}`;
         });
     });
 });
+
+suite('Frame rate override', () => {
+    const dfText = 'Scenarist_SCC V1.0\n\n00:00:01;00\t9420 9420 942f 942f\n';
+
+    test('override replaces detected frame rate', () => {
+        const doc = new SccDocument();
+        assert.strictEqual(doc.analyze(dfText, undefined, '25').frameRate, '25');
+    });
+
+    test('auto behaves like no override', () => {
+        const a = new SccDocument().analyze(dfText, undefined, 'auto');
+        const b = new SccDocument().analyze(dfText);
+        assert.strictEqual(a.frameRate, b.frameRate);
+    });
+
+    test('changing override invalidates the analysis cache', () => {
+        const doc = new SccDocument();
+        const auto = doc.analyze(dfText).frameRate;
+        const forced = doc.analyze(dfText, undefined, '25').frameRate;
+        assert.strictEqual(forced, '25');
+        assert.notStrictEqual(auto, forced);
+    });
+});

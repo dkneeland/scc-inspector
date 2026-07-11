@@ -142,11 +142,12 @@ export class SccDocument {
     private rawText: string = '';
     private lines: string[] = [];
 
-    analyze(text: string, version?: number): AnalysisResult {
-        if (this.analysis !== null && version !== undefined && version === this.version) {
+    analyze(text: string, version?: number, frameRateOverride?: string): AnalysisResult {
+        const override = frameRateOverride && frameRateOverride !== 'auto' ? frameRateOverride : '';
+        const newHash = createHash('md5').update(text).update('|' + override).digest('hex');
+        if (this.analysis !== null && version !== undefined && version === this.version && this.contentHash === newHash) {
             return this.analysis;
         }
-        const newHash = createHash('md5').update(text).digest('hex');
         if (this.analysis && this.contentHash === newHash) {
             this.version = version;
             return this.analysis;
@@ -156,11 +157,11 @@ export class SccDocument {
         this.lines = text.split(/\r?\n/);
         this.contentHash = newHash;
         this.version = version;
-        this.analysis = this._performAnalysis(text);
+        this.analysis = this._performAnalysis(text, override || null);
         return this.analysis;
     }
 
-    private _performAnalysis(text: string): AnalysisResult {
+    private _performAnalysis(text: string, frameRateOverride: string | null = null): AnalysisResult {
         const timestampMap = new Map<number, TimestampInfo>();
         const timeMap = new Map<number, TimeRange>();
         const lineTexts = new Map<number, string>();
@@ -169,7 +170,7 @@ export class SccDocument {
         const nonMonotonicLines: number[] = [];
 
         const [detectedFrameRate] = detectFrameRate(text);
-        const validFrameRate = detectedFrameRate !== 'INVALID' ? detectedFrameRate : null;
+        const validFrameRate = frameRateOverride ?? (detectedFrameRate !== 'INVALID' ? detectedFrameRate : null);
 
         const lines = this.lines;
         const pendingLines: number[] = [];

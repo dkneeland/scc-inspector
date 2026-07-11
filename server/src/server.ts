@@ -12,15 +12,17 @@ import {
     Diagnostic,
     DiagnosticSeverity,
     Range,
-    CodeLens
+    CodeLens,
+    DocumentSymbol,
+    SymbolKind
 } from 'vscode-languageserver/node';
 
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { parseSccCode, iterHexWords, TIMESTAMP_PATTERN, HexWord } from './sccDecoder';
 import { addFrames, parseTimestampStr } from './sccTimecode';
-import { SccDocument } from './sccAnalyzer';
+import { SccDocument, AnalysisResult } from './sccAnalyzer';
 import { formatTooltip, formatTimestampLine, TooltipCard } from './sccTooltip';
-import { buildCodeLenses } from './sccNavigation';
+import { buildCodeLenses, buildDocumentSymbols } from './sccNavigation';
 
 const connection = createConnection(ProposedFeatures.all);
 const documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
@@ -41,7 +43,8 @@ connection.onInitialize((params: InitializeParams) => {
         capabilities: {
             textDocumentSync: TextDocumentSyncKind.Incremental,
             hoverProvider: true,
-            codeLensProvider: { resolveProvider: false }
+            codeLensProvider: { resolveProvider: false },
+            documentSymbolProvider: true
         }
     };
 
@@ -60,11 +63,13 @@ connection.onInitialized(() => {
 interface SCCSettings {
     hoverEnabled: boolean;
     decorationsEnabled: boolean;
+    frameRateOverride: string;
 }
 
 const defaultSettings: SCCSettings = {
     hoverEnabled: true,
-    decorationsEnabled: true
+    decorationsEnabled: true,
+    frameRateOverride: 'auto'
 };
 
 let globalSettings: SCCSettings = defaultSettings;
@@ -93,6 +98,7 @@ connection.onDidChangeConfiguration(change => {
             (change.settings.sccInspector || defaultSettings)
         );
     }
+    documents.all().forEach(doc => void publishDiagnostics(doc.uri));
 });
 
 documents.onDidClose(e => {
@@ -112,8 +118,13 @@ function getOrCreateSccDocument(uri: string): SccDocument {
     return doc;
 }
 
-function formatHeaderHover(document: TextDocument, sccDoc: SccDocument, lineText: string): Hover {
-    const analysis = sccDoc.analyze(document.getText(), document.version);
+async function analyzeWithSettings(uri: string, text: string): Promise<AnalysisResult> {
+    const settings = await _getDocumentSettings(uri);
+    const sccDoc = getOrCreateSccDocument(uri);
+    return sccDoc.analyze(text, undefined, settings.frameRateOverride);
+}
+
+function formatHeaderHover(document: TextDocument, sccDoc: SccDocument, lineText: string, analysis: AnalysisResult): Hover {
     const diagnostics = sccDoc.collectDiagnostics();
     const errorCount = diagnostics.filter(d => d.severity === 'error').length;
     const warningCount = diagnostics.filter(d => d.severity === 'warning').length;
@@ -122,7 +133,7 @@ function formatHeaderHover(document: TextDocument, sccDoc: SccDocument, lineText
     const lines = [
         '**SCC File**',
         '',
-        `- **Frame rate:** ${analysis.detectedFrameRate ?? 'unknown'}`,
+                `- **Frame rate:** ${analysis.frameRate ?? analysis.detectedFrameRate ?? 'unknown'}`,
         `- **Data lines:** ${analysis.timestampMap.size}`,
         `- **Diagnostics:** ${errorCount} error(s), ${warningCount} warning(s), ${infoCount} info`
     ];
@@ -162,7 +173,7 @@ function formatTimestampHover(tsMatch: RegExpMatchArray, lineNum: number, analys
             kind: MarkupKind.Markdown,
             value: [
                 `- **Timestamp:** \`${tsMatch[0]}\``,
-                `- **Frame rate:** ${analysis.detectedFrameRate ?? 'unknown'}`,
+        `- **Frame rate:** ${analysis.frameRate ?? analysis.detectedFrameRate ?? 'unknown'}`,
                 `- **Packets on line:** ${packetCount}`,
                 durationLine
             ].join('\n')
@@ -174,12 +185,12 @@ function formatTimestampHover(tsMatch: RegExpMatchArray, lineNum: number, analys
     };
 }
 
-function publishDiagnostics(uri: string): void {
+async function publishDiagnostics(uri: string): Promise<void> {
     const document = documents.get(uri);
     if (!document) return;
     
     const sccDoc = getOrCreateSccDocument(uri);
-    sccDoc.analyze(document.getText(), document.version);
+    await analyzeWithSettings(uri, document.getText());
     const rawDiagnostics = sccDoc.collectDiagnostics();
     
     const diagnostics: Diagnostic[] = rawDiagnostics.map(d => ({
@@ -215,7 +226,7 @@ documents.onDidChangeContent(e => {
 });
 
 connection.onHover(
-    (textDocumentPosition: TextDocumentPositionParams): Hover | undefined => {
+    async (textDocumentPosition: TextDocumentPositionParams): Promise<Hover | undefined> => {
         const document = documents.get(textDocumentPosition.textDocument.uri);
         if (!document) {
             return undefined;
@@ -227,10 +238,11 @@ connection.onHover(
             end: { line: position.line, character: Number.MAX_VALUE }
         });
 
+        const analysis = await analyzeWithSettings(document.uri, document.getText());
         const sccDoc = getOrCreateSccDocument(document.uri);
 
         if (position.line === 0 && line.trim() === 'Scenarist_SCC V1.0') {
-            return formatHeaderHover(document, sccDoc, line);
+            return formatHeaderHover(document, sccDoc, line, analysis);
         }
 
         const tsMatch = line.match(TIMESTAMP_PATTERN);
@@ -241,7 +253,7 @@ connection.onHover(
         const tsStart = tsMatch.index ?? 0;
         const tsEnd = tsStart + tsMatch[0].length;
         if (position.character >= tsStart && position.character < tsEnd) {
-            return formatTimestampHover(tsMatch, position.line, sccDoc.analyze(document.getText(), document.version));
+            return formatTimestampHover(tsMatch, position.line, analysis);
         }
 
         const hexWords = [...iterHexWords(line)];
@@ -360,7 +372,6 @@ connection.onHover(
                     code
                 };
         }
-        const analysis = sccDoc.analyze(document.getText(), document.version);
         const baseTime = tsMatch[0];
         
         let displayTime = baseTime;
@@ -406,14 +417,26 @@ connection.onHover(
     }
 );
 
-connection.onCodeLens((params): CodeLens[] => {
+connection.onCodeLens(async (params): Promise<CodeLens[]> => {
     const document = documents.get(params.textDocument.uri);
     if (!document) return [];
-    const sccDoc = getOrCreateSccDocument(params.textDocument.uri);
-    const analysis = sccDoc.analyze(document.getText(), document.version);
+    const analysis = await analyzeWithSettings(params.textDocument.uri, document.getText());
     return buildCodeLenses(analysis).map(l => ({
         range: Range.create(l.line, 0, l.line, 0),
         command: { title: l.title, command: l.command }
+    }));
+});
+
+connection.onDocumentSymbol(async (params): Promise<DocumentSymbol[]> => {
+    const document = documents.get(params.textDocument.uri);
+    if (!document) return [];
+    const analysis = await analyzeWithSettings(params.textDocument.uri, document.getText());
+    return buildDocumentSymbols(analysis).map(s => ({
+        name: s.name,
+        detail: s.detail,
+        kind: SymbolKind.String,
+        range: Range.create(s.line, 0, s.line, 0),
+        selectionRange: Range.create(s.line, 0, s.line, 0)
     }));
 });
 
