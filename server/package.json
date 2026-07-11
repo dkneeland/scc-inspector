@@ -9,7 +9,7 @@
   "scripts": {
     "compile": "tsc -b",
     "watch": "tsc -b -w",
-    "compile-tests": "tsc test/analyzer.test.ts test/decoder.test.ts test/timecode.test.ts test/tooltip.test.ts test/parity.test.ts test/event_time.test.ts --outDir test --esModuleInterop --module commonjs --target ES2020 --resolveJsonModule",
+    "compile-tests": "tsc test/analyzer.test.ts test/decoder.test.ts test/timecode.test.ts test/tooltip.test.ts test/parity.test.ts test/event_time.test.ts test/navigation.test.ts --outDir test --esModuleInterop --module commonjs --target ES2020 --resolveJsonModule",
     "test": "npm run compile-tests && mocha --ui tdd test/**/*.test.js"
   },
   "dependencies": {

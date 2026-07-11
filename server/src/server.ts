@@ -11,7 +11,8 @@ import {
     MarkupKind,
     Diagnostic,
     DiagnosticSeverity,
-    Range
+    Range,
+    CodeLens
 } from 'vscode-languageserver/node';
 
 import { TextDocument } from 'vscode-languageserver-textdocument';
@@ -19,6 +20,7 @@ import { parseSccCode, iterHexWords, TIMESTAMP_PATTERN, HexWord } from './sccDec
 import { addFrames, parseTimestampStr } from './sccTimecode';
 import { SccDocument } from './sccAnalyzer';
 import { formatTooltip, formatTimestampLine, TooltipCard } from './sccTooltip';
+import { buildCodeLenses } from './sccNavigation';
 
 const connection = createConnection(ProposedFeatures.all);
 const documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
@@ -38,7 +40,8 @@ connection.onInitialize((params: InitializeParams) => {
     const result: InitializeResult = {
         capabilities: {
             textDocumentSync: TextDocumentSyncKind.Incremental,
-            hoverProvider: true
+            hoverProvider: true,
+            codeLensProvider: { resolveProvider: false }
         }
     };
 
@@ -404,6 +407,17 @@ connection.onHover(
         };
     }
 );
+
+connection.onCodeLens((params): CodeLens[] => {
+    const document = documents.get(params.textDocument.uri);
+    if (!document) return [];
+    const sccDoc = getOrCreateSccDocument(params.textDocument.uri);
+    const analysis = sccDoc.analyze(document.getText(), document.version);
+    return buildCodeLenses(analysis).map(l => ({
+        range: Range.create(l.line, 0, l.line, 0),
+        command: { title: l.title, command: l.command }
+    }));
+});
 
 documents.listen(connection);
 connection.listen();
