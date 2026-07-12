@@ -198,7 +198,15 @@ export function detectFrameRate(fileText: string): [string, number] {
             hasDropFrame = true;
         }
         
-        const frame = parseInt(ts.slice(-2), 10);
+        const parts = ts.replace(';', ':').split(':');
+        const h = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        const s = parseInt(parts[2], 10);
+        const frame = parseInt(parts[3], 10);
+        // ponytail: skip fully-corrupt timestamps (already SCC002) — they aren't a frame-rate signal
+        if (h > 23 || m > 59 || s > 59) {
+            continue;
+        }
         if (frame > invalidThreshold) {
             return ['INVALID', count];
         }

@@ -443,16 +443,23 @@ export class SccDocument {
         const nextLineNum = sortedKeys[currentIdx + 1];
         const nextEntry = timestampMap.get(nextLineNum);
         
-        if (!nextEntry || !frameRate) {
+        if (!nextEntry) {
             return { isOverflow: false, overflowCount: 0 };
         }
+        // ponytail: fallback to 29.97 NDF when frame rate can't be detected;
+        // this is the dominant SCC rate; upgrade to real detection if needed
+        const effectiveFrameRate = frameRate ?? '29.97 NDF';
 
         try {
             const currentTs = parseTimestampStr(currentEntry.timestampStr);
+            // ponytail: skip overflow check for garbage timestamps (already SCC002)
+            if (currentTs.hours > 23 || currentTs.minutes > 59 || currentTs.seconds > 59) {
+                return { isOverflow: false, overflowCount: 0 };
+            }
             const [lastPacketTime] = addFrames(
                 currentTs.hours, currentTs.minutes, currentTs.seconds, currentTs.frames,
                 Math.max(0, currentEntry.packetCount - 1),
-                frameRate
+                effectiveFrameRate
             );
 
             if (compareTimestamps(lastPacketTime, nextEntry.timestampStr) >= 0) {
@@ -470,7 +477,7 @@ export class SccDocument {
                     const [testTime] = addFrames(
                         currentTs.hours, currentTs.minutes, currentTs.seconds, currentTs.frames,
                         testIdx,
-                        frameRate
+                        effectiveFrameRate
                     );
                     if (compareTimestamps(testTime, nextEntry.timestampStr) >= 0) {
                         overflowCount = hexWords.length - i;

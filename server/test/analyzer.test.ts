@@ -451,6 +451,81 @@ ${line}`;
 
             assert.strictEqual(diagnostics.length, 0, 'Well-formed file should produce no diagnostics');
         });
+
+        test('trailing garbage timestamp does not poison overflow detection', () => {
+            const doc = new SccDocument();
+            // Buffer overflow on line 2, followed by a corrupt timestamp at end (H/M/S all out of range)
+            const input = `Scenarist_SCC V1.0
+
+00:00:04:00\t9420 9420 94ad 94ad c8e5 ecec ef80 f7ef f2ec 6480
+
+00:00:04:01\t942f 942f
+
+99:99:99:99\t9420 9420 942f 942f`;
+
+            const result = doc.analyze(input);
+            assert.notStrictEqual(result.frameRate, null, 'frameRate should be detected despite corrupt timestamp');
+            assert.notStrictEqual(result.detectedFrameRate, 'INVALID', 'detectedFrameRate should not be INVALID');
+            const diagnostics = doc.collectDiagnostics();
+
+            const scc003 = diagnostics.find(d => d.code === 'SCC003');
+            assert.ok(scc003, 'Should have SCC003 for buffer overflow');
+            assert.strictEqual(scc003!.lineNum, 2);
+
+            const scc002 = diagnostics.find(d => d.code === 'SCC002');
+            assert.ok(scc002, 'Should have SCC002 for invalid timestamp');
+            assert.strictEqual(scc002!.lineNum, 6);
+        });
+
+        test('SCC003 fires even when frame rate detection returns INVALID', () => {
+            const doc = new SccDocument();
+            // Buffer overflow on line 2, followed by a timestamp with frame=30
+            // (valid H/M/S, but frame out of spec → INVALID detection still occurs,
+            // but overflow should be detected via fallback)
+            const input = `Scenarist_SCC V1.0
+
+00:00:01:00\t9420 9420 94ad 94ad c8e5 ecec ef80 f7ef f2ec 6480
+
+00:00:01:01\t942f 942f
+
+00:00:02:30\t9420 9420 942f 942f`;
+
+            const result = doc.analyze(input);
+            assert.strictEqual(result.frameRate, null, 'frameRate should be null (INVALID detection)');
+            assert.strictEqual(result.detectedFrameRate, 'INVALID');
+
+            const diagnostics = doc.collectDiagnostics();
+
+            const scc003 = diagnostics.find(d => d.code === 'SCC003');
+            assert.ok(scc003, 'Should have SCC003 for buffer overflow despite INVALID frame rate');
+            assert.strictEqual(scc003!.lineNum, 2);
+            assert.ok(scc003!.message.includes('overflow'));
+        });
+
+        test('corrupt timestamp at start of file does not poison overflow detection', () => {
+            const doc = new SccDocument();
+            // Same as the trailing test, but the 99:99:99:99 is the first timestamp
+            const input = `Scenarist_SCC V1.0
+
+99:99:99:99\t9420 9420 942f 942f
+
+00:00:04:00\t9420 9420 94ad 94ad c8e5 ecec ef80 f7ef f2ec 6480
+
+00:00:04:01\t942f 942f`;
+
+            const result = doc.analyze(input);
+            assert.notStrictEqual(result.frameRate, null, 'frameRate should be detected despite corrupt timestamp');
+            assert.notStrictEqual(result.detectedFrameRate, 'INVALID', 'detectedFrameRate should not be INVALID');
+            const diagnostics = doc.collectDiagnostics();
+
+            const scc003 = diagnostics.find(d => d.code === 'SCC003');
+            assert.ok(scc003, 'Should have SCC003 for buffer overflow');
+            assert.strictEqual(scc003!.lineNum, 4);
+
+            const scc002 = diagnostics.find(d => d.code === 'SCC002');
+            assert.ok(scc002, 'Should have SCC002 for invalid timestamp');
+            assert.strictEqual(scc002!.lineNum, 2);
+        });
     });
 
     suite('getBufferSnapshot - control commands', () => {
