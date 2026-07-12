@@ -1,5 +1,7 @@
 src/**
 out/**
 tsconfig.json
+tsconfig.tsbuildinfo
 node_modules/**
 **/*.map
+icon.svg

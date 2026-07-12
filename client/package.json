@@ -2,8 +2,23 @@
   "name": "scc-inspector-vscode",
   "displayName": "SCC Inspector",
   "description": "Analyze and debug SCC (Scenarist Closed Caption) files",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "scc-tools",
+  "icon": "icon.png",
+  "preview": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dkneeland/scc-inspector"
+  },
+  "keywords": [
+    "scc",
+    "closed caption",
+    "eia-608",
+    "line 21",
+    "subtitle",
+    "caption",
+    "scenarist"
+  ],
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -67,8 +82,7 @@
     "test": "echo \"No tests yet\""
   },
   "dependencies": {
-    "vscode-languageclient": "^9.0.1",
-    "scc-language-server": "*"
+    "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",

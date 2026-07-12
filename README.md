@@ -1,44 +1,34 @@
-# SCC Language Server
+# SCC Inspector
 
-A Language Server Protocol (LSP) implementation for SCC (Scenarist Closed Caption) files.
+A VS Code extension for analyzing and debugging SCC (Scenarist Closed Caption / EIA-608) files, built as a Language Server Protocol client/server pair.
 
-## Features
+Decodes hex caption codes on hover, surfaces parity/timing/buffer problems as diagnostics, shows decoded captions with in/out timecode as code lenses, and populates the Outline with caption text. See the [extension README](client/README.md) for the full feature tour, settings, and limitations.
 
-- Hover tooltips showing decoded EIA-608 commands
-- Error diagnostics for parity and timing issues
-- Support for 23.98, 25, 29.97 DF, and 29.97 NDF frame rates
+Successor to the [scc_inspector](https://github.com/dkneeland/scc_inspector) Notepad++ plugin.
 
-## Installation
+## Structure
 
-### VS Code
-
-Install the SCC Inspector extension from the VS Code Marketplace.
-
-### Other Editors
-
-```bash
-npm install -g scc-language-server
 ```
-
-Then configure your editor's LSP client to use `scc-language-server --stdio`.
+├── client/     # VS Code extension (language registration, decorations, LSP client)
+│   └── dist/   # esbuild bundles (extension + server), built by npm run compile
+├── server/     # Language server — all SCC intelligence
+│   ├── src/    # Analyzer, decoder, timecode, tooltip, navigation modules
+│   ├── data/   # EIA-608 constants (single source of truth, JSON)
+│   └── test/   # Mocha test suite
+└── samples/    # Sample SCC files
+```
 
 ## Development
 
 ```bash
 npm install
-npm run compile
-npm test
+npm run compile          # tsc + esbuild bundles into client/dist/
+npm run test --workspace=server
+npm run lint
+npm run package          # builds client/scc-inspector-vscode-<version>.vsix
 ```
 
-## Structure
-
-```
-├── client/     # VS Code extension
-├── server/     # LSP server
-│   ├── src/    # Core modules
-│   └── data/   # EIA-608 constants
-└── samples/    # Sample SCC files
-```
+Press `F5` in VS Code to launch the Extension Development Host, then open a file from `samples/`.
 
 ## License
 

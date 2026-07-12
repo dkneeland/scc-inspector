@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <rect width="128" height="128" rx="26" fill="#0e1116"/>
+  <g font-family="Consolas, 'Cascadia Code', ui-monospace, monospace" font-size="16" font-weight="700" fill="#262e3f" letter-spacing="1">
+    <text x="16" y="26">9420 9420</text>
+    <text x="16" y="52">94f2 97a1</text>
+    <text x="16" y="78">e5e5 942f</text>
+    <text x="16" y="104">942c 942f</text>
+  </g>
+  <rect x="26" y="38" width="76" height="46" rx="10" fill="#0e1116" fill-opacity="0.92" stroke="#6cb6ff" stroke-width="6"/>
+  <path d="M58.92 53.58 A10.5 10.5 0 1 0 58.92 68.42" fill="none" stroke="#6cb6ff" stroke-width="6.5" stroke-linecap="round"/>
+  <path d="M86.92 53.58 A10.5 10.5 0 1 0 86.92 68.42" fill="none" stroke="#6cb6ff" stroke-width="6.5" stroke-linecap="round"/>
+  <path d="M34 96 q6 -6 12 0 t12 0 t12 0 t12 0 t12 0" fill="none" stroke="#ff5c5c" stroke-width="3.5" stroke-linecap="round"/>
+</svg>
