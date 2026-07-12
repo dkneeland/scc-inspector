@@ -14,7 +14,7 @@ suite('Code lenses', () => {
 
     function lenses(t: string) {
         const doc = new SccDocument();
-        return buildCodeLenses(doc.analyze(t, 1));
+        return buildCodeLenses(doc.analyze(t));
     }
 
     test('caption line yields rendered text with in/out timing', () => {

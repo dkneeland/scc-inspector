@@ -74,8 +74,11 @@ export function activate(context: ExtensionContext) {
     context.subscriptions.push(
         languages.onDidChangeDiagnostics(event => {
             for (const uri of event.uris) {
-                const editor = window.visibleTextEditors.find(e => e.document.uri.toString() === uri.toString());
-                if (editor) applyProblemDecorations(editor);
+                for (const editor of window.visibleTextEditors) {
+                    if (editor.document.uri.toString() === uri.toString()) {
+                        applyProblemDecorations(editor);
+                    }
+                }
             }
         }),
         window.onDidChangeActiveTextEditor(editor => {
@@ -83,8 +86,9 @@ export function activate(context: ExtensionContext) {
         }),
         workspace.onDidChangeConfiguration(event => {
             if (event.affectsConfiguration('sccInspector.decorationsEnabled')) {
-                const editor = window.activeTextEditor;
-                if (editor) applyProblemDecorations(editor);
+                for (const editor of window.visibleTextEditors) {
+                    applyProblemDecorations(editor);
+                }
             }
         })
     );

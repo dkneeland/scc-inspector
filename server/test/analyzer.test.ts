@@ -697,6 +697,8 @@ ${line}`;
             
             const highlighted = snapshot.bufferText.substring(snapshot.highlightStart, snapshot.highlightEnd);
             assert.ok(highlighted.includes('R14'), 'highlighted text should include row info');
+            const tagCount = snapshot.bufferText.split('R14').length - 1;
+            assert.strictEqual(tagCount, 1, 'PAC tag must appear exactly once (no duplicated prefix): ' + snapshot.bufferText);
         });
 
         test('second text word highlight after prefix', () => {
@@ -981,7 +983,7 @@ ${line}`;
             assert.notStrictEqual(snapshot.channelLabel, undefined, 'TEXT should inherit a channel label across lines');
         });
 
-        test('analyze version param returns cached result on matching version', () => {
+        test('analyze returns cached result for identical input (hash-based)', () => {
             const doc = new SccDocument();
             const input = `Scenarist_SCC V1.0
 
@@ -991,14 +993,14 @@ ${line}`;
 
 00:00:05:00\t942c 942c`;
 
-            // First call with version 1 — warms the cache
-            const result1 = doc.analyze(input, 1);
-            // Second call with same version — should return from cache
-            const result2 = doc.analyze(input, 1);
-            assert.strictEqual(result1, result2, 'Matching version should return same object reference');
-            // Different version — should re-analyze
-            const result3 = doc.analyze(input, 2);
-            assert.ok(result3 !== result2 || result3.frameRate === result2.frameRate, 'Different version should produce equivalent analysis');
+            // First call — warms the cache
+            const result1 = doc.analyze(input);
+            // Second call with same input — should return from cache
+            const result2 = doc.analyze(input);
+            assert.strictEqual(result1, result2, 'Same input should return same object reference');
+            // Different text — should re-analyze
+            const result3 = doc.analyze(input + '\n');
+            assert.ok(result3 !== result2 || result3.frameRate === result2.frameRate, 'Different input should produce equivalent analysis');
         });
     });
 });
@@ -1008,11 +1010,11 @@ suite('Frame rate override', () => {
 
     test('override replaces detected frame rate', () => {
         const doc = new SccDocument();
-        assert.strictEqual(doc.analyze(dfText, undefined, '25').frameRate, '25');
+        assert.strictEqual(doc.analyze(dfText, '25').frameRate, '25');
     });
 
     test('auto behaves like no override', () => {
-        const a = new SccDocument().analyze(dfText, undefined, 'auto');
+        const a = new SccDocument().analyze(dfText, 'auto');
         const b = new SccDocument().analyze(dfText);
         assert.strictEqual(a.frameRate, b.frameRate);
     });
@@ -1020,7 +1022,7 @@ suite('Frame rate override', () => {
     test('changing override invalidates the analysis cache', () => {
         const doc = new SccDocument();
         const auto = doc.analyze(dfText).frameRate;
-        const forced = doc.analyze(dfText, undefined, '25').frameRate;
+        const forced = doc.analyze(dfText, '25').frameRate;
         assert.strictEqual(forced, '25');
         assert.notStrictEqual(auto, forced);
     });

@@ -13,6 +13,7 @@ import {
     DiagnosticSeverity,
     Range,
     CodeLens,
+    CodeLensRefreshRequest,
     DocumentSymbol,
     SymbolKind
 } from 'vscode-languageserver/node';
@@ -31,6 +32,7 @@ const sccDocuments: Map<string, SccDocument> = new Map();
 const pendingDiagnostics: Map<string, NodeJS.Timeout> = new Map();
 
 let hasConfigurationCapability = false;
+let hasCodeLensRefreshSupport = false;
 
 connection.onInitialize((params: InitializeParams) => {
     const capabilities = params.capabilities;
@@ -38,6 +40,7 @@ connection.onInitialize((params: InitializeParams) => {
     hasConfigurationCapability = !!(
         capabilities.workspace && !!capabilities.workspace.configuration
     );
+    hasCodeLensRefreshSupport = !!capabilities.workspace?.codeLens?.refreshSupport;
 
     const result: InitializeResult = {
         capabilities: {
@@ -90,7 +93,7 @@ function _getDocumentSettings(resource: string): Thenable<SCCSettings> {
     return result;
 }
 
-connection.onDidChangeConfiguration(change => {
+connection.onDidChangeConfiguration(async change => {
     if (hasConfigurationCapability) {
         documentSettings.clear();
     } else {
@@ -99,6 +102,9 @@ connection.onDidChangeConfiguration(change => {
         );
     }
     documents.all().forEach(doc => void publishDiagnostics(doc.uri));
+    if (hasCodeLensRefreshSupport) {
+        await connection.sendRequest(CodeLensRefreshRequest.type);
+    }
 });
 
 documents.onDidClose(e => {
@@ -121,10 +127,10 @@ function getOrCreateSccDocument(uri: string): SccDocument {
 async function analyzeWithSettings(uri: string, text: string): Promise<AnalysisResult> {
     const settings = await _getDocumentSettings(uri);
     const sccDoc = getOrCreateSccDocument(uri);
-    return sccDoc.analyze(text, undefined, settings.frameRateOverride);
+    return sccDoc.analyze(text, settings.frameRateOverride);
 }
 
-function formatHeaderHover(document: TextDocument, sccDoc: SccDocument, lineText: string, analysis: AnalysisResult): Hover {
+function formatHeaderHover(sccDoc: SccDocument, lineText: string, analysis: AnalysisResult): Hover {
     const diagnostics = sccDoc.collectDiagnostics();
     const errorCount = diagnostics.filter(d => d.severity === 'error').length;
     const warningCount = diagnostics.filter(d => d.severity === 'warning').length;
@@ -133,7 +139,7 @@ function formatHeaderHover(document: TextDocument, sccDoc: SccDocument, lineText
     const lines = [
         '**SCC File**',
         '',
-                `- **Frame rate:** ${analysis.frameRate ?? analysis.detectedFrameRate ?? 'unknown'}`,
+        `- **Frame rate:** ${analysis.frameRate ?? analysis.detectedFrameRate ?? 'unknown'}`,
         `- **Data lines:** ${analysis.timestampMap.size}`,
         `- **Diagnostics:** ${errorCount} error(s), ${warningCount} warning(s), ${infoCount} info`
     ];
@@ -150,7 +156,7 @@ function formatHeaderHover(document: TextDocument, sccDoc: SccDocument, lineText
     };
 }
 
-function formatTimestampHover(tsMatch: RegExpMatchArray, lineNum: number, analysis: ReturnType<SccDocument['analyze']>): Hover {
+function formatTimestampHover(tsMatch: RegExpMatchArray, lineNum: number, analysis: AnalysisResult): Hover {
     const timestampInfo = analysis.timestampMap.get(lineNum);
     const packetCount = timestampInfo?.packetCount ?? 0;
     const durationFrames = Math.max(0, packetCount - 1);
@@ -173,7 +179,7 @@ function formatTimestampHover(tsMatch: RegExpMatchArray, lineNum: number, analys
             kind: MarkupKind.Markdown,
             value: [
                 `- **Timestamp:** \`${tsMatch[0]}\``,
-        `- **Frame rate:** ${analysis.frameRate ?? analysis.detectedFrameRate ?? 'unknown'}`,
+                `- **Frame rate:** ${analysis.frameRate ?? analysis.detectedFrameRate ?? 'unknown'}`,
                 `- **Packets on line:** ${packetCount}`,
                 durationLine
             ].join('\n')
@@ -232,6 +238,10 @@ connection.onHover(
             return undefined;
         }
 
+        if (!(await _getDocumentSettings(document.uri)).hoverEnabled) {
+            return undefined;
+        }
+
         const position = textDocumentPosition.position;
         const line = document.getText({
             start: { line: position.line, character: 0 },
@@ -242,7 +252,7 @@ connection.onHover(
         const sccDoc = getOrCreateSccDocument(document.uri);
 
         if (position.line === 0 && line.trim() === 'Scenarist_SCC V1.0') {
-            return formatHeaderHover(document, sccDoc, line, analysis);
+            return formatHeaderHover(sccDoc, line, analysis);
         }
 
         const tsMatch = line.match(TIMESTAMP_PATTERN);

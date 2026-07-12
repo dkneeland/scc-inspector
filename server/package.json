@@ -1,16 +1,12 @@
 {
-  "name": "scc-language-server",
+  "name": "scc-inspector-server",
   "version": "0.1.0",
   "description": "LSP server for SCC (Scenarist Closed Caption) files",
-  "main": "./out/server.js",
-  "bin": {
-    "scc-language-server": "./out/server.js"
-  },
   "scripts": {
     "compile": "tsc -b",
     "watch": "tsc -b -w",
-    "compile-tests": "tsc test/analyzer.test.ts test/decoder.test.ts test/timecode.test.ts test/tooltip.test.ts test/parity.test.ts test/event_time.test.ts test/navigation.test.ts --outDir test --esModuleInterop --module commonjs --target ES2020 --resolveJsonModule",
-    "test": "npm run compile-tests && mocha --ui tdd test/**/*.test.js"
+    "compile-tests": "tsc -p tsconfig.test.json",
+    "test": "tsc -b && npm run compile-tests && mocha --ui tdd test/**/*.test.js"
   },
   "dependencies": {
     "vscode-languageserver": "^9.0.1",

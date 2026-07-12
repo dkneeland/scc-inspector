@@ -59,7 +59,22 @@ interface BufferState {
     lastLabel?: string;
 }
 
-function applyEventToBuffer(state: BufferState, evt: DecodeEvent, wordText: string): void {
+function formatPacTag(row: number | undefined, col: number | undefined, color: string | undefined): string {
+    return `{R${String(row ?? 0).padStart(2, '0')} C${String(col ?? 0).padStart(2, '0')} ${color ?? 'White'}}`;
+}
+
+function packetTimeAt(timestampStr: string, wordIdx: number, frameRate: string | null): string {
+    if (!frameRate) return timestampStr;
+    try {
+        const ts = parseTimestampStr(timestampStr);
+        return addFrames(ts.hours, ts.minutes, ts.seconds, ts.frames, wordIdx, frameRate)[0];
+    } catch {
+        return timestampStr;
+    }
+}
+
+function applyEventToBuffer(state: BufferState, evt: DecodeEvent, wordText: string): { start: number; end: number } {
+    let start = state.bufText.length;
     if (evt.label !== undefined) state.lastLabel = evt.label;
     switch (evt.type) {
         case 'PAC':
@@ -69,8 +84,9 @@ function applyEventToBuffer(state: BufferState, evt: DecodeEvent, wordText: stri
                     col: evt.col ?? 0,
                     color: evt.color ?? 'White'
                 };
+                start = -1;
             } else {
-                state.bufText += `{R${String(evt.row ?? 0).padStart(2, '0')} C${String(evt.col ?? 0).padStart(2, '0')} ${evt.color ?? 'White'}}`;
+                state.bufText += formatPacTag(evt.row, evt.col, evt.color);
             }
             state.isItalic = evt.isItalic ?? false;
             break;
@@ -87,13 +103,20 @@ function applyEventToBuffer(state: BufferState, evt: DecodeEvent, wordText: stri
         case 'CONTROL':
             if (evt.isBackspace && state.bufText.length > 0) {
                 state.bufText = state.bufText.slice(0, -1);
-            }
-            if (isEnm(wordText) || isRcl(wordText)) {
+                start = Math.max(0, start - 1);
+            } else if (isEnm(wordText) || isRcl(wordText)) {
+                start = 0;
                 state.bufText = '';
                 state.initialState = null;
+            } else {
+                start = -1;
             }
             break;
+        default:
+            start = -1;
     }
+    const end = start >= 0 ? state.bufText.length : -1;
+    return { start, end };
 }
 
 function binarySearchIndex(sortedArr: number[], target: number): number {
@@ -137,26 +160,18 @@ function getContentRange(hexWords: HexWord[]): { startChar: number; endChar: num
 
 export class SccDocument {
     private contentHash: string = '';
-    private version: number | undefined = undefined;
     private analysis: AnalysisResult | null = null;
-    private rawText: string = '';
     private lines: string[] = [];
 
-    analyze(text: string, version?: number, frameRateOverride?: string): AnalysisResult {
+    analyze(text: string, frameRateOverride?: string): AnalysisResult {
         const override = frameRateOverride && frameRateOverride !== 'auto' ? frameRateOverride : '';
         const newHash = createHash('md5').update(text).update('|' + override).digest('hex');
-        if (this.analysis !== null && version !== undefined && version === this.version && this.contentHash === newHash) {
-            return this.analysis;
-        }
         if (this.analysis && this.contentHash === newHash) {
-            this.version = version;
             return this.analysis;
         }
-        
-        this.rawText = text;
+
         this.lines = text.split(/\r?\n/);
         this.contentHash = newHash;
-        this.version = version;
         this.analysis = this._performAnalysis(text, override || null);
         return this.analysis;
     }
@@ -213,17 +228,7 @@ export class SccDocument {
                 }
 
                 if (isEoc(word.text)) {
-                    let startTimeStr: string;
-                    try {
-                        const ts = parseTimestampStr(timestampStr);
-                        if (validFrameRate) {
-                            [startTimeStr] = addFrames(ts.hours, ts.minutes, ts.seconds, ts.frames, wordIdx, validFrameRate);
-                        } else {
-                            startTimeStr = timestampStr;
-                        }
-                    } catch {
-                        startTimeStr = timestampStr;
-                    }
+                    const startTimeStr = packetTimeAt(timestampStr, wordIdx, validFrameRate);
 
                     for (const activeLine of activeLines) {
                         const tr = timeMap.get(activeLine);
@@ -246,17 +251,7 @@ export class SccDocument {
                 }
 
                 if (isEdm(word.text)) {
-                    let endTimeStr: string;
-                    try {
-                        const ts = parseTimestampStr(timestampStr);
-                        if (validFrameRate) {
-                            [endTimeStr] = addFrames(ts.hours, ts.minutes, ts.seconds, ts.frames, wordIdx, validFrameRate);
-                        } else {
-                            endTimeStr = timestampStr;
-                        }
-                    } catch {
-                        endTimeStr = timestampStr;
-                    }
+                    const endTimeStr = packetTimeAt(timestampStr, wordIdx, validFrameRate);
 
                     for (const activeLine of activeLines) {
                         const tr = timeMap.get(activeLine);
@@ -386,53 +381,19 @@ export class SccDocument {
             const evt = parseSccCode(word.text, word.isPaired);
 
             if (wordLogicalIdx === targetWordIdx) {
-                switch (evt.type) {
-                    case 'TEXT':
-                        highlightStart = buf.bufText.length;
-                        buf.bufText += evt.text ?? '';
-                        highlightEnd = buf.bufText.length;
-                        break;
-                    case 'PAC': {
-                        const pacStr = `{R${String(evt.row ?? 0).padStart(2, '0')} C${String(evt.col ?? 0).padStart(2, '0')} ${evt.color ?? 'White'}}`;
-                        highlightStart = buf.bufText.length;
-                        buf.bufText += pacStr;
-                        highlightEnd = buf.bufText.length;
-                        break;
-                    }
-                    case 'MIDROW': {
-                        const midStr = buf.isItalic ? '</i>' : '<i>';
-                        highlightStart = buf.bufText.length;
-                        buf.bufText += midStr;
-                        highlightEnd = buf.bufText.length;
-                        buf.isItalic = !buf.isItalic;
-                        break;
-                    }
-                    case 'INDENT': {
-                        const indentStr = ' '.repeat(evt.spaces ?? 0);
-                        highlightStart = buf.bufText.length;
-                        buf.bufText += indentStr;
-                        highlightEnd = buf.bufText.length;
-                        break;
-                    }
-                    case 'CONTROL':
-                        if (evt.isBackspace) {
-                            highlightStart = Math.max(0, buf.bufText.length - 1);
-                            buf.bufText = buf.bufText.slice(0, -1);
-                            highlightEnd = buf.bufText.length;
-                        } else if (isEnm(word.text) || isRcl(word.text)) {
-                            highlightStart = 0;
-                            buf.bufText = '';
-                            highlightEnd = 0;
-                            buf.initialState = null;
-                        }
-                        break;
-                    case 'NULL':
-                        highlightStart = -1;
-                        highlightEnd = -1;
-                        break;
-                    default:
-                        highlightStart = buf.bufText.length;
-                        highlightEnd = buf.bufText.length;
+                // Edge case: first PAC on a line (initialState is null).
+                // applyEventToBuffer would set initialState but not append the PAC tag.
+                // Append the tag inline so the highlight covers it, and leave
+                // initialState null so _formatBuffer doesn't prepend it a second time.
+                if (evt.type === 'PAC' && buf.initialState === null) {
+                    const tag = formatPacTag(evt.row, evt.col, evt.color);
+                    highlightStart = buf.bufText.length;
+                    buf.bufText += tag;
+                    highlightEnd = buf.bufText.length;
+                } else {
+                    const range = applyEventToBuffer(buf, evt, word.text);
+                    highlightStart = range.start;
+                    highlightEnd = range.end;
                 }
                 break;
             }
@@ -457,8 +418,7 @@ export class SccDocument {
         if (!state) {
             return text;
         }
-        const prefix = `{R${String(state.row).padStart(2, '0')} C${String(state.col).padStart(2, '0')} ${state.color}}`;
-        return prefix + text;
+        return formatPacTag(state.row, state.col, state.color) + text;
     }
 
     checkOverflow(lineNum: number): OverflowResult {
@@ -529,10 +489,6 @@ export class SccDocument {
 
     getAnalysis(): AnalysisResult | null {
         return this.analysis;
-    }
-
-    getContentHash(): string {
-        return this.contentHash;
     }
 
     collectDiagnostics(): DiagnosticInfo[] {

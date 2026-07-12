@@ -1,5 +1,5 @@
 {
-  "name": "scc-language-server",
+  "name": "scc-inspector",
   "private": true,
   "workspaces": [
     "client",
