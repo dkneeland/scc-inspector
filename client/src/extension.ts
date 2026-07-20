@@ -65,7 +65,7 @@ export function activate(context: ExtensionContext) {
 
     problemDecoration = window.createTextEditorDecorationType({
         isWholeLine: true,
-        backgroundColor: new ThemeColor('editorError.background'),
+        backgroundColor: new ThemeColor('sccInspector.problemLineBackground'),
         overviewRulerColor: new ThemeColor('editorError.foreground'),
         overviewRulerLane: OverviewRulerLane.Full
     });

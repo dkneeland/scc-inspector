@@ -29,6 +29,17 @@
   "activationEvents": ["onLanguage:scc"],
   "main": "./dist/extension.js",
   "contributes": {
+    "colors": [
+      {
+        "id": "sccInspector.problemLineBackground",
+        "description": "Background color for lines with SCC problems",
+        "defaults": {
+          "dark": "#ff000015",
+          "light": "#ff000010",
+          "highContrast": "#ff000030"
+        }
+      }
+    ],
     "languages": [
       {
         "id": "scc",
