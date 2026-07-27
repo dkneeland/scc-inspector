@@ -8,6 +8,7 @@ samples/AH*.scc
 server/test/*.js
 server/test/*.js.map
 .claude/
+.serena/
 # Internal working area (never published)
 _workbench/
 

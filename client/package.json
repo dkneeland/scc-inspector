@@ -2,10 +2,10 @@
   "name": "scc-inspector-vscode",
   "displayName": "SCC Inspector",
   "description": "Analyze and debug SCC (Scenarist Closed Caption) files",
-  "version": "0.2.0",
-  "publisher": "scc-tools",
+  "version": "1.0.0",
+  "publisher": "DaveKneeland",
   "icon": "icon.png",
-  "preview": true,
+  "preview": false,
   "repository": {
     "type": "git",
     "url": "https://github.com/dkneeland/scc-inspector"
