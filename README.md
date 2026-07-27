@@ -4,7 +4,11 @@ A VS Code extension for analyzing and debugging SCC (Scenarist Closed Caption / 
 
 Decodes hex caption codes on hover, surfaces parity/timing/buffer problems as diagnostics, shows decoded captions with in/out timecode as code lenses, and populates the Outline with caption text. See the [extension README](client/README.md) for the full feature tour, settings, and limitations.
 
-Successor to the [scc_inspector](https://github.com/dkneeland/scc_inspector) Notepad++ plugin.
+![Diagnostics](https://raw.githubusercontent.com/dkneeland/scc-inspector/main/client/images/diagnostics.png)
+
+![Hover tooltip](https://raw.githubusercontent.com/dkneeland/scc-inspector/main/client/images/hover.png)
+
+Successor to the [scc_inspector](https://github.com/dkneeland/scc-inspector-npp) Notepad++ plugin.
 
 ## Structure
 
