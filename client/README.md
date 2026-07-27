@@ -10,7 +10,7 @@ SCC files store captions as timecoded pairs of hex words — compact for broadca
 
 Problems are flagged as you edit and listed in the Problems panel, with red line tints and minimap bands so trouble spots stand out while scrolling.
 
-![Diagnostics](images/diagnostics.png)
+![Diagnostics](https://raw.githubusercontent.com/dkneeland/scc-inspector/main/client/images/diagnostics.png)
 
 | Code | Severity | Meaning |
 | --- | --- | --- |
@@ -25,13 +25,13 @@ Problems are flagged as you edit and listed in the Problems panel, with red line
 
 Hover any hex word to see the decoded command, the exact time that packet hits air (frame-accurate, drop-frame aware), and the caption buffer at that moment with the hovered code highlighted in context. Hover a timestamp for frame rate, packet count, and line duration.
 
-![Hover tooltip](images/hover.png)
+![Hover tooltip](https://raw.githubusercontent.com/dkneeland/scc-inspector/main/client/images/hover.png)
 
 ### Decoded-caption code lenses
 
 Every caption line gets a lens showing its decoded text and display timing — `Hello [00:00:01:00 → 00:00:05:00]` — so you can read the file top to bottom without decoding a single byte. Captions that never display or never erase are called out.
 
-![Code lenses](images/lenses.png)
+![Code lenses](https://raw.githubusercontent.com/dkneeland/scc-inspector/main/client/images/lenses.png)
 
 ### Outline navigation
 
